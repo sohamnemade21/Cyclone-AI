@@ -65,15 +65,10 @@
     "distance_to_land_source": 243.0
   },
   "metrics": {
-    "random_forest": {
-      "mae": 5.302,
-      "rmse": 8.86,
-      "r2": 0.7169
-    },
     "tuned_xgboost": {
-      "mae": 4.905,
-      "rmse": 8.418,
-      "r2": 0.7445
+      "mae": 4.812,
+      "rmse": 8.191,
+      "r2": 0.7581
     },
     "horizon_general_metrics": {
       "3": {

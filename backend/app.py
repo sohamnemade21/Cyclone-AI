@@ -1,7 +1,9 @@
-from pathlib import Path
+import os
 import time
 import logging
+from contextlib import asynccontextmanager
 from typing import Dict, Any, List, Optional
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -20,24 +22,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger("cycloneguard.api")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager that validates model loading at application startup."""
+    logger.info(f"Initializing {settings.APP_NAME} v{settings.APP_VERSION} ({settings.ENVIRONMENT})...")
+    engine = CycloneMLEngine.get_instance()
+    if not engine.is_loaded or engine.final_model is None:
+        error_msg = "CRITICAL: Final XGBoost model failed to load during startup."
+        logger.critical(error_msg)
+        raise RuntimeError(error_msg)
+    logger.info(f"Production ML Engine successfully verified. Features: {len(engine.features)}")
+    yield
+    logger.info("Shutting down CycloneGuard AI service...")
+
 app = FastAPI(
     title=settings.APP_NAME,
     description=settings.APP_DESCRIPTION,
     version=settings.APP_VERSION,
+    lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json"
 )
 
-# GZip compression for responses > 1000 bytes
+# GZip compression for large responses
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# CORS Middleware with configurable origins
+# CORS Middleware with explicit origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS if "*" not in settings.CORS_ORIGINS else ["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -49,7 +65,6 @@ async def add_process_time_and_log(request: Request, call_next):
     process_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
     response.headers["X-Process-Time-Ms"] = str(process_time_ms)
     
-    # Avoid verbose logging on static assets and health probes
     if not request.url.path.startswith("/static") and request.url.path not in ("/healthz", "/readyz"):
         logger.info(f"{request.method} {request.url.path} -> Status {response.status_code} ({process_time_ms}ms)")
     return response
@@ -111,23 +126,25 @@ class TelemetryPayload(BaseModel):
     distance_to_land_source: float = Field(240.0, ge=0.0, description="Distance to nearest coastline (km)")
 
 # ------------------------------------------------------------------------------
-# Container Probes & Health Checks
+# System Health & Probes
 # ------------------------------------------------------------------------------
 @app.get("/healthz", tags=["System Probes"])
 def liveness_probe():
-    """Liveness probe for Kubernetes / Docker / Cloud Run."""
+    """Liveness probe for Docker / Kubernetes / Render."""
     return {"status": "alive"}
 
 @app.get("/readyz", tags=["System Probes"])
 def readiness_probe():
     """Readiness probe checking ML engine state."""
-    return {"status": "ready", "engine_loaded": engine.is_loaded}
+    if not engine.is_loaded:
+        raise HTTPException(status_code=503, detail="ML engine is not ready")
+    return {"status": "ready", "engine_loaded": True}
 
 @app.get("/api/health", tags=["System Probes"])
 def get_health():
-    """Comprehensive engine status report."""
+    """Comprehensive service health report."""
     return {
-        "status": "online" if engine.is_loaded else "degraded",
+        "status": "online" if engine.is_loaded else "offline",
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
@@ -176,7 +193,7 @@ def get_categories():
 def predict_cyclone_intensity(payload: TelemetryPayload):
     try:
         data = payload.model_dump()
-        result = engine.predict_single(data, use_horizon_model=True)
+        result = engine.predict_single(data)
         return {"success": True, "prediction": result}
     except Exception as e:
         logger.error(f"Inference error: {e}", exc_info=True)
@@ -204,15 +221,14 @@ def get_historical_storm_timeline(storm_id: str):
         raise HTTPException(status_code=404, detail=f"Storm ID '{storm_id}' not found")
     return {"success": True, "timeline": timeline}
 
-# ------------------------------------------------------------------------------
-# Static File Mounts & Frontend Serving
-# ------------------------------------------------------------------------------
-if settings.FRONTEND_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(settings.FRONTEND_DIR)), name="static")
+# Optional local static file mounting (if frontend directory is present)
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+if FRONTEND_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
     @app.get("/", include_in_schema=False)
     def serve_frontend_index():
-        index_file = settings.FRONTEND_DIR / "index.html"
+        index_file = FRONTEND_DIR / "index.html"
         if index_file.exists():
             return FileResponse(index_file)
-        return JSONResponse({"status": "Frontend build not found"}, status_code=404)
+        return JSONResponse({"status": "CycloneGuard AI API is online. Frontend is deployed on Vercel."}, status_code=200)

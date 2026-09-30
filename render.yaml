@@ -1,20 +1,20 @@
 services:
   - type: web
     name: cycloneguard-ai
-    env: python
-    region: oregon
+    runtime: docker
     plan: starter
-    buildCommand: pip install -r requirements.txt
-    startCommand: python run_server.py
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /healthz
     envVars:
       - key: ENVIRONMENT
         value: production
       - key: PORT
-        value: 10000
+        value: "10000"
       - key: WORKERS
-        value: 2
+        value: "1"
       - key: LOG_LEVEL
         value: info
       - key: CORS_ORIGINS
-        value: "*"
+        value: "https://cycloneguard-ai.vercel.app,http://localhost:3000,http://localhost:5173,http://127.0.0.1:8000"

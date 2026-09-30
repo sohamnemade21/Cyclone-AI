@@ -27,6 +27,9 @@ scratch/
 tests/
 .pytest_cache/
 
+# Frontend (Deployed separately to Vercel)
+frontend/
+
 # OS files
 .DS_Store
 Thumbs.db

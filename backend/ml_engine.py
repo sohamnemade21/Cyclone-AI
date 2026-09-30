@@ -12,7 +12,7 @@ from backend.config import settings
 
 logger = logging.getLogger("cycloneguard.ml_engine")
 
-# IMD Cyclone Intensity Categorization Scale
+# Official IMD Cyclone Intensity Categorization Scale
 def get_imd_category(wind_kts: float) -> Dict[str, Any]:
     """Resolves sustained wind speed (knots) into standard IMD classification tier."""
     wind_kmh = round(wind_kts * 1.852, 1)
@@ -119,79 +119,64 @@ class CycloneMLEngine:
             return cls._instance
 
     def load_artifacts(self) -> None:
-        """Loads model weights, metadata, and historical records with auto-training fallback."""
-        try:
-            # 1. Load model metadata
-            meta_path = settings.MODELS_DIR / "model_metadata.json"
-            if meta_path.exists():
-                with open(meta_path, "r", encoding="utf-8") as f:
-                    self.metadata = json.load(f)
-                    self.features = self.metadata.get("features", [])
-                    self.feature_defaults = self.metadata.get("feature_defaults", {})
-            else:
-                logger.warning(f"Metadata file not found at {meta_path}.")
+        """Loads final XGBoost model and metadata strictly. Fails fast if artifacts are missing."""
+        meta_path = settings.METADATA_PATH
+        if not meta_path.exists():
+            raise FileNotFoundError(
+                f"Required model metadata file not found at: {meta_path}. "
+                "Ensure backend/models/model_metadata.json is included in the deployment."
+            )
 
-            # 2. Look for candidate model binaries
-            model_candidates = [
-                settings.BASE_DIR / "cycloneguard_xgboost_final.joblib",
+        with open(meta_path, "r", encoding="utf-8") as f:
+            self.metadata = json.load(f)
+            self.features = self.metadata.get("features", [])
+            self.feature_defaults = self.metadata.get("feature_defaults", {})
+
+        if not self.features:
+            raise RuntimeError(f"Metadata at {meta_path} contains no valid feature list.")
+
+        model_path = settings.MODEL_PATH
+        if not model_path.exists():
+            # Check secondary candidate locations
+            candidates = [
                 settings.MODELS_DIR / "cycloneguard_xgboost_final.joblib",
+                settings.BASE_DIR / "cycloneguard_xgboost_final.joblib",
                 settings.MODELS_DIR / "cyclone_xgb_model.joblib"
             ]
+            found = False
+            for cand in candidates:
+                if cand.exists():
+                    model_path = cand
+                    found = True
+                    break
+            if not found:
+                raise FileNotFoundError(
+                    f"Production ML model binary 'cycloneguard_xgboost_final.joblib' not found at {settings.MODEL_PATH} "
+                    "or candidate locations. Automatic training and fallback modes are disabled in production."
+                )
 
-            for path in model_candidates:
-                if path.exists():
-                    try:
-                        self.final_model = joblib.load(path)
-                        logger.info(f"Loaded ML model from: {path}")
-                        break
-                    except Exception as load_err:
-                        logger.warning(f"Failed loading {path}: {load_err}")
+        try:
+            self.final_model = joblib.load(model_path)
+            if not hasattr(self.final_model, "predict"):
+                raise RuntimeError(f"Loaded object from {model_path} does not implement 'predict' method.")
+            self.is_loaded = True
+            logger.info(f"Loaded Tuned XGBoost Model from: {model_path} | Features: {len(self.features)}")
+        except Exception as e:
+            self.is_loaded = False
+            raise RuntimeError(f"Failed to load XGBoost model binary from {model_path}: {e}") from e
 
-            # 3. Auto-train fallback if no model exists but dataset is present
-            if self.final_model is None and settings.DATASET_PATH.exists():
-                logger.warning("No pre-trained model binary found. Triggering automated model generation...")
-                try:
-                    from backend.train_models import train_and_export
-                    train_and_export()
-                    # Re-attempt load
-                    for path in model_candidates:
-                        if path.exists():
-                            self.final_model = joblib.load(path)
-                            logger.info(f"Successfully auto-trained and loaded model from: {path}")
-                            break
-                except Exception as train_err:
-                    logger.error(f"Auto-training failed: {train_err}")
-
-            if hasattr(self.final_model, "predict"):
-                self.is_loaded = True
-
-            # 4. Load historical dataset into memory for explorer
-            if settings.DATASET_PATH.exists():
+        # Optional historical dataset for timeline explorer
+        if settings.DATASET_PATH.exists():
+            try:
                 self.historical_df = pd.read_csv(settings.DATASET_PATH, low_memory=False)
                 logger.info(f"Loaded historical dataset: {len(self.historical_df):,} records")
+            except Exception as e:
+                logger.warning(f"Could not load historical dataset (non-fatal): {e}")
 
-            logger.info(f"Cyclone ML Engine ready | Status: {'ACTIVE' if self.is_loaded else 'DEGRADED'} | Features: {len(self.features)}")
-        except Exception as e:
-            logger.error(f"Error loading ML artifacts: {e}", exc_info=True)
-            self.is_loaded = False
-
-    def predict_single(self, input_data: Dict[str, Any], use_horizon_model: bool = True) -> Dict[str, Any]:
-        """Predicts target sustained wind speed (knots) for the given atmospheric telemetry."""
+    def predict_single(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Predicts target sustained wind speed (knots) using only the final tuned XGBoost model."""
         if not self.is_loaded or self.final_model is None:
-            self.load_artifacts()
-            if not self.is_loaded or self.final_model is None:
-                # Fallback estimation based on WMO/IMD inputs if model unavailable
-                base_w = float(input_data.get("wmo_wind_kts") or input_data.get("imd_newdelhi_wind_kts") or 45.0)
-                logger.warning("ML model unavailable, using physics-based heuristic fallback.")
-                return {
-                    "forecast_horizon_h": int(input_data.get("forecast_horizon_h", 24)),
-                    "predicted_wind_kts": base_w,
-                    "predicted_wind_kmh": round(base_w * 1.852, 1),
-                    "current_wind_kts": base_w,
-                    "wind_change_kts": 0.0,
-                    "model_used": "Physics Heuristic Baseline",
-                    "category": get_imd_category(base_w)
-                }
+            raise RuntimeError("Production XGBoost model is not loaded.")
 
         horizon = int(input_data.get("forecast_horizon_h", 24))
         
@@ -210,7 +195,7 @@ class CycloneMLEngine:
 
         df_in = pd.DataFrame([row], columns=self.features)
 
-        # Run inference
+        # Execute XGBoost inference
         raw_pred = self.final_model.predict(df_in)
         pred_wind_kts = round(float(np.clip(raw_pred[0], 10.0, 210.0)), 2)
         pred_wind_kmh = round(pred_wind_kts * 1.852, 1)
@@ -230,7 +215,7 @@ class CycloneMLEngine:
         }
 
     def predict_multi_horizon(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Generates multi-lead-time trajectory curve (+3h to +48h) with uncertainty cone expansion."""
+        """Generates multi-lead-time trajectory curve (+3h to +48h) using the tuned XGBoost model."""
         horizons = [3, 6, 9, 12, 18, 24, 36, 48]
         horizon_results = []
 
@@ -273,7 +258,7 @@ class CycloneMLEngine:
         }
 
     def get_historical_storms(self) -> List[Dict[str, Any]]:
-        """Returns sorted list of historical storm summaries."""
+        """Returns list of unique storms from historical records."""
         if self.historical_df is None or self.historical_df.empty:
             return []
 
@@ -300,7 +285,7 @@ class CycloneMLEngine:
         return storms
 
     def get_storm_timeline(self, storm_id: str) -> Dict[str, Any]:
-        """Returns full historical timeline for point-by-point ground-truth vs prediction validation."""
+        """Returns historical track points and predictions generated strictly by the XGBoost model."""
         if self.historical_df is None or self.historical_df.empty:
             return {}
 
@@ -322,11 +307,9 @@ class CycloneMLEngine:
             target_wind = float(d.get("target_wind_kts", 0.0)) if pd.notna(d.get("target_wind_kts")) else wmo_wind
             horizon = int(d.get("forecast_horizon_h", 24)) if pd.notna(d.get("forecast_horizon_h")) else 24
 
-            try:
-                pred_obj = self.predict_single(d)
-                pred_wind = pred_obj["predicted_wind_kts"]
-            except Exception:
-                pred_wind = round(target_wind, 1)
+            # Prediction strictly by model
+            pred_obj = self.predict_single(d)
+            pred_wind = pred_obj["predicted_wind_kts"]
 
             points.append({
                 "timestamp": str(d.get("timestamp_utc", "")),

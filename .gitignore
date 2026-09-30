@@ -92,5 +92,11 @@ desktop.ini
 .env.local
 .env.*.local
 *.secret
-secrets.json
-*.joblib 
+# Large unused models (e.g. 114MB Random Forest baseline)
+backend/models/cyclone_rf_model.joblib
+backend/models/horizon_models.joblib
+
+# Explicitly track the final production model binary & metadata
+!cycloneguard_xgboost_final.joblib
+!backend/models/cycloneguard_xgboost_final.joblib
+!backend/models/model_metadata.json

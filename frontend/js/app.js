@@ -1,5 +1,5 @@
 // Main Frontend Controller for CycloneGuard AI
-const API_BASE = window.location.origin;
+const API_BASE = (window.CYCLONE_CONFIG?.API_BASE || "").replace(/\/$/, "");
 
 let multiHorizonChart = null;
 let historicalChart = null;
@@ -489,12 +489,10 @@ async function loadModelMetrics() {
         const m = data.metrics;
 
         if (m.tuned_xgboost) {
-            document.getElementById('metricXgbMae').textContent = `${m.tuned_xgboost.mae} kts`;
-            document.getElementById('metricXgbR2').textContent = `${m.tuned_xgboost.r2}`;
-        }
-        if (m.random_forest) {
-            document.getElementById('metricRfMae').textContent = `${m.random_forest.mae} kts`;
-            document.getElementById('metricRfR2').textContent = `${m.random_forest.r2}`;
+            const maeEl = document.getElementById('metricXgbMae');
+            const r2El = document.getElementById('metricXgbR2');
+            if (maeEl) maeEl.textContent = `${m.tuned_xgboost.mae} kts`;
+            if (r2El) r2El.textContent = `${m.tuned_xgboost.r2}`;
         }
 
         // Top features chart

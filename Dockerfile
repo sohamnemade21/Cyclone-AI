@@ -1,54 +1,70 @@
 # ==============================================================================
-# Multi-Stage / Lean Production Dockerfile for CycloneGuard AI
+# CycloneGuard AI - Production FastAPI + XGBoost Docker Container
 # ==============================================================================
-FROM python:3.11-slim AS base
+FROM python:3.11-slim
 
-# Set environment flags
+# ------------------------------------------------------------------------------
+# 1. Environment Configuration
+# ------------------------------------------------------------------------------
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH="/app" \
-    PORT=8000 \
+    PORT=10000 \
     HOST=0.0.0.0 \
-    WORKERS=2 \
+    WORKERS=1 \
+    LOG_LEVEL=info \
     ENVIRONMENT=production
 
-# Install system dependencies & curl for container healthcheck
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# ------------------------------------------------------------------------------
+# 2. Install System Dependencies for Health Checks
+# ------------------------------------------------------------------------------
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
-# Create non-privileged user for security
-RUN groupadd -g 1001 appuser && \
-    useradd -u 1001 -g appuser -m -s /bin/bash appuser
+# ------------------------------------------------------------------------------
+# 3. Create Non-Root System User for Security Compliance
+# ------------------------------------------------------------------------------
+RUN groupadd --system appuser && \
+    useradd --system --gid appuser --create-home appuser
 
-# Copy dependency definitions and install
+# ------------------------------------------------------------------------------
+# 4. Install Python Dependencies
+# ------------------------------------------------------------------------------
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy application source code
+# ------------------------------------------------------------------------------
+# 5. Copy Backend Application & Model Artifacts (Excluding Frontend)
+# ------------------------------------------------------------------------------
 COPY backend/ ./backend/
-COPY frontend/ ./frontend/
+COPY cycloneguard_xgboost_final.joblib ./
 COPY CycloneGuard_Bay_of_Bengal_India_Enhanced_Real_Dataset.csv* ./
-COPY cycloneguard_xgboost_final.joblib* ./
-COPY run_server.py .
+COPY run_server.py ./
 
-# Fix permissions for non-root user
+# ------------------------------------------------------------------------------
+# 6. Set File Ownership & Switch to Non-Root User
+# ------------------------------------------------------------------------------
 RUN chown -R appuser:appuser /app
-
-# Switch to non-root user
 USER appuser
 
-# Expose API port
-EXPOSE 8000
+# Expose container application port
+EXPOSE 10000
 
-# Docker Healthcheck Probe
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:8000/healthz || exit 1
+# ------------------------------------------------------------------------------
+# 7. Container Health Check Probe
+# ------------------------------------------------------------------------------
+HEALTHCHECK --interval=30s \
+    --timeout=5s \
+    --start-period=15s \
+    --retries=3 \
+    CMD curl -f http://localhost:10000/healthz || exit 1
 
-# Launch production server
+# ------------------------------------------------------------------------------
+# 8. Start Production Server
+# ------------------------------------------------------------------------------
 CMD ["python", "run_server.py"]
