@@ -5,7 +5,7 @@
 
 ## 📌 Project Overview
 
-**CycloneGuard AI** is a state-of-the-art operational meteorological decision-support system designed to forecast tropical cyclone intensity, multi-horizon trajectories (+3h to +48h), and rapid intensification risks across the Bay of Bengal and North Indian Ocean regions. 
+**CycloneGuard AI** is an operational meteorological decision-support system designed to forecast tropical cyclone intensity, multi-horizon trajectories (+3h to +48h), and rapid intensification risks across the Bay of Bengal and North Indian Ocean regions. 
 
 Powered by **Tuned XGBoost Regressors** and **Random Forest Baselines** trained on **34,714 high-resolution meteorological observation records** across **199 historical cyclone lifecycles**, CycloneGuard AI provides early warning intelligence adhering strictly to the **India Meteorological Department (IMD)** 9-tier classification scale.
 
@@ -15,7 +15,7 @@ Powered by **Tuned XGBoost Regressors** and **Random Forest Baselines** trained 
 - 🎯 **Scenario Benchmark Presets**: One-click scenario loading for landmark historical profiles (e.g., *Super Cyclone Amphan*, *Extremely Severe Cyclone Fani*, *Monsoon Deep Depression*).
 - 📜 **Historical Storm Explorer**: Timeline scrubbing and interactive point-by-point validation comparing ground truth satellite observations against AI predictions.
 - 📋 **Official IMD Categorization Matrix**: Real-time category assignment (LPA $\rightarrow$ SuCS) with maritime danger indicators and official port warning signal mapping.
-- 🚀 **Full-Stack Microservice Architecture**: Fast, lightweight FastAPI REST backend paired with a dark glassmorphic HTML5/CSS3/JS dashboard.
+- 🚀 **Production-Grade Microservice**: High-throughput FastAPI REST backend with multi-stage Docker containerization, health probes (`/healthz`, `/readyz`), GZip compression, and automated test suites.
 
 ---
 
@@ -36,10 +36,9 @@ flowchart TD
         HorizonModels["Horizon-Specific Models\n(+3h, +6h, +9h, +12h, +18h, +24h, +36h, +48h)"]
     end
 
-    subgraph Backend_Layer ["3. FastAPI Backend Services (Python)"]
+    subgraph Backend_Layer ["3. Production Backend (FastAPI & Gunicorn)"]
         API["FastAPI REST Server (app.py)"]
-        HealthEP["GET /api/health"]
-        MetricsEP["GET /api/metrics"]
+        Probes["Health Probes\nGET /healthz\nGET /readyz"]
         PredictEP["POST /api/predict"]
         MultiHorizonEP["POST /api/predict/multi-horizon"]
         HistoryEP["GET /api/historical/storms"]
@@ -57,8 +56,8 @@ flowchart TD
     Splitter --> Imputer
     Imputer --> XGB & RF & HorizonModels
     XGB & HorizonModels --> API
-    API --> HealthEP & MetricsEP & PredictEP & MultiHorizonEP & HistoryEP
-    HealthEP & MetricsEP & PredictEP & MultiHorizonEP & HistoryEP --> UI
+    API --> Probes & PredictEP & MultiHorizonEP & HistoryEP
+    Probes & PredictEP & MultiHorizonEP & HistoryEP --> UI
     UI --> Tab1 & Tab2 & Tab3 & Tab4
 ```
 
@@ -134,10 +133,14 @@ CycloneGuard AI automatically maps model predictions against the official IMD No
 
 ```
 Cyclone AI/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                            # GitHub Actions automated test & Docker CI pipeline
 ├── backend/                                  # Python Machine Learning Backend
 │   ├── __init__.py                           # Module initializer
-│   ├── app.py                                # FastAPI application REST routes & static mounts
-│   ├── ml_engine.py                          # CycloneMLEngine singleton inference engine
+│   ├── app.py                                # FastAPI application REST routes, probes & static mounts
+│   ├── config.py                             # Production environment settings & configuration
+│   ├── ml_engine.py                          # Thread-safe inference engine with auto-training fallback
 │   ├── train_models.py                       # Automated ML training script & evaluator
 │   └── models/                               # Serialized ML Artifacts
 │       ├── cycloneguard_xgboost_final.joblib # Primary trained XGBoost model binary
@@ -155,10 +158,21 @@ Cyclone AI/
 │       ├── map.js                            # Leaflet interactive maps & threat cone rendering
 │       └── presets.js                        # Pre-configured historical storm scenarios
 │
+├── tests/                                    # Automated Unit & Integration Tests
+│   ├── __init__.py
+│   ├── test_api.py                           # API routes & schema validation test suite
+│   └── test_ml_engine.py                     # ML bounds & IMD category test suite
+│
 ├── CycloneGuard_Bay_of_Bengal_India_Enhanced_Real_Dataset.csv # 34,714 records dataset
-├── CycloneGuard_Final.ipynb                  # Exploratory Data Analysis & Notebook experiments
-├── requirements.txt                          # Python dependencies list
-├── run_server.py                             # Full-stack server launcher
+├── Dockerfile                                # Multi-stage production container definition
+├── docker-compose.yml                        # Production service container orchestration
+├── .dockerignore                             # Docker build context filters
+├── Procfile                                  # Deployment command for Heroku/Railway/Render
+├── render.yaml                               # Render Blueprint deployment definition
+├── .env.example                              # Environment configuration template
+├── pytest.ini                                # Pytest runner configuration
+├── requirements.txt                          # Production & testing dependencies list
+├── run_server.py                             # Full-stack environment-driven server launcher
 └── README.md                                 # Comprehensive project documentation
 ```
 
@@ -166,20 +180,10 @@ Cyclone AI/
 
 ## 🌐 API Endpoint Reference
 
-### 1. Health & Engine Status
-- **Endpoint**: `GET /api/health`
-- **Response**:
-```json
-{
-  "status": "online",
-  "service": "CycloneGuard AI Engine",
-  "model_used": "Tuned XGBoost Regression",
-  "models_loaded": true,
-  "feature_count": 30,
-  "dataset_loaded": true,
-  "total_historical_records": 34714
-}
-```
+### 1. System Probes & Health Checks
+- **Liveness Probe**: `GET /healthz` $\rightarrow$ `{"status": "alive"}`
+- **Readiness Probe**: `GET /readyz` $\rightarrow$ `{"status": "ready", "engine_loaded": true}`
+- **Detailed Health Report**: `GET /api/health`
 
 ### 2. Single Horizon Intensity Inference
 - **Endpoint**: `POST /api/predict`
@@ -233,11 +237,29 @@ Cyclone AI/
 
 ---
 
-## 💻 Installation & Setup Guide
+## 🐳 Production Deployment Guide
 
-### Prerequisites
-- **Python**: Version 3.10 or higher installed.
-- **Pip**: Latest Python package manager.
+### Option 1: Docker & Docker Compose (Recommended)
+
+```bash
+# 1. Build and run container in detached mode
+docker compose up -d --build
+
+# 2. Check container logs
+docker compose logs -f
+
+# 3. Check health probe
+curl http://localhost:8000/healthz
+```
+
+### Option 2: Cloud PaaS (Render, Railway, AWS ECS, Heroku)
+
+- **Render**: Connect the repository — Render will automatically detect [`render.yaml`](file:///d:/cyclone%20production/Cyclone%20AI/Cyclone%20AI/render.yaml) and configure the environment, build step, and health probes.
+- **Heroku / Railway**: Deploy directly with the included [`Procfile`](file:///d:/cyclone%20production/Cyclone%20AI/Cyclone%20AI/Procfile).
+
+---
+
+## 💻 Local Setup & Testing Guide
 
 ### 1. Clone the Repository
 ```bash
@@ -245,7 +267,7 @@ git clone <repository_url>
 cd "Cyclone AI"
 ```
 
-### 2. Set Up Virtual Environment (Recommended)
+### 2. Set Up Virtual Environment
 ```bash
 # Windows
 python -m venv venv
@@ -261,10 +283,9 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. (Optional) Re-train & Export Models
-If you wish to re-evaluate or train models from scratch on updated datasets:
+### 4. Run Automated Test Suite
 ```bash
-python -m backend.train_models
+pytest
 ```
 
 ### 5. Launch Full-Stack Server
@@ -276,21 +297,11 @@ python run_server.py
 
 ## 🖥️ Accessing the Dashboard & API
 
-Once `run_server.py` is executed, open your browser:
+Once running, access the service via:
 
-- 🎨 **Web Dashboard Application**: [http://localhost:8000](http://localhost:8000)
-- 📖 **Interactive OpenAPI (Swagger) Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- 🔍 **Alternative API Docs (ReDoc)**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
-
----
-
-## 🚀 Quickstart Walkthrough
-
-1. **Open Dashboard**: Navigate to `http://localhost:8000`.
-2. **Select Scenario Preset**: Use the **Scenario** drop-down menu in Tab 1 to auto-fill telemetry for landmark events like *Amphan (Super Cyclone)* or *Fani (Extremely Severe Storm)*.
-3. **Execute AI Inference**: Click **⚡ Execute Cyclone AI Inference** to generate multi-horizon intensity curves (+3h to +48h).
-4. **Inspect Interactive Radar**: Switch to the **🛰️ Interactive Live Radar** tab to view the dynamic bearing track, motion vectors, and expanding threat cone over the Bay of Bengal.
-5. **Explore Historical Storms**: Navigate to **📜 Historical Storm Explorer**, select a historical cyclone, and use the playback scrubber to analyze AI model prediction accuracy against actual ground truth track points.
+- 🎨 **Web Dashboard**: [http://localhost:8000](http://localhost:8000)
+- 📖 **OpenAPI (Swagger) Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- 🔍 **ReDoc Documentation**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
 ---
 

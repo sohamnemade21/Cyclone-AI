@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  cycloneguard-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cycloneguard_ai_service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - HOST=0.0.0.0
+      - PORT=8000
+      - WORKERS=2
+      - LOG_LEVEL=info
+      - CORS_ORIGINS=*
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s

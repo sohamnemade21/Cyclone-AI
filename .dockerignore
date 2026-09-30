@@ -1,0 +1,33 @@
+# Docker Ignore Rules
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environments
+venv/
+env/
+.venv/
+
+# Git & IDEs
+.git/
+.gitignore
+.gitattributes
+.vscode/
+.idea/
+.gemini/
+
+# Notebooks & temporary dumps
+.ipynb_checkpoints/
+*-checkpoint.ipynb
+nb_dump.txt
+inspect_nb.py
+scratch/
+tests/
+.pytest_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
