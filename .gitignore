@@ -1,0 +1,96 @@
+# ==============================================================================
+# CYCLONEGUARD AI - GITIGNORE
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Python Environment & Bytecode Cache
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+env.bak/
+venv.bak/
+
+# ------------------------------------------------------------------------------
+# 2. Jupyter Notebook & Temporary Inspection Files
+# ------------------------------------------------------------------------------
+.ipynb_checkpoints
+*-checkpoint.ipynb
+nb_dump.txt
+scratch/
+
+# ------------------------------------------------------------------------------
+# 3. Machine Learning Artifacts & Heavy Data Files
+# ------------------------------------------------------------------------------
+# Log files
+*.log
+logs/
+
+# Large model artifacts (uncomment if storing models in Git LFS or S3)
+# *.joblib
+# *.pkl
+# *.h5
+
+# Datasets (uncomment if datasets are stored externally)
+# *.csv
+# *.xlsx
+
+# ------------------------------------------------------------------------------
+# 4. IDEs, Editors & OS System Files
+# ------------------------------------------------------------------------------
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# PyCharm / IntelliJ
+.idea/
+
+# Custom AI / Assistant config cache
+.gemini/
+
+# OS Operating System Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ------------------------------------------------------------------------------
+# 5. Local Environment Configs & Secrets
+# ------------------------------------------------------------------------------
+.env
+.env.local
+.env.*.local
+*.secret
+secrets.json
+*.joblib 

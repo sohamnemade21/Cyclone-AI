@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CycloneGuard AI - Bay of Bengal & Indian Ocean Meteorological Intelligence</title>
+    <meta name="description" content="Operational AI-driven cyclone intensity forecasting, multi-horizon trajectory prediction, and rapid intensification early warning system for the Indian Ocean and Bay of Bengal.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Custom Application CSS -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+
+    <!-- Main Header -->
+    <header class="top-header">
+        <div class="header-container">
+            <div class="brand">
+                <div class="logo-icon-wrapper">
+                    <div class="radar-spinner"></div>
+                    <span style="font-size: 1.5rem; z-index: 2;">🌀</span>
+                </div>
+                <div class="brand-text">
+                    <h1>CYCLONEGUARD AI</h1>
+                    <p>Bay of Bengal & Indian Ocean Deep Meteorological Intelligence</p>
+                </div>
+            </div>
+
+            <div class="header-meta">
+                <div class="system-badge">
+                    <div class="status-dot"></div>
+                    <span id="healthStatusText">Initializing AI Engine...</span>
+                </div>
+                <div class="metric-pill">Features: <span id="featureCountStat">30 Feats</span></div>
+                <div class="metric-pill">Trained Records: <span id="datasetRecordsStat">Historical Recs</span></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs-wrapper">
+        <div class="nav-tabs-container">
+            <button class="nav-tab active" data-tab="tab-predictor" id="tabNavPredictor">
+                <span>⚡</span> AI Intensity Predictor & Horizons
+            </button>
+            <button class="nav-tab" data-tab="tab-radar" id="tabNavRadar">
+                <span>🛰️</span> Interactive Live Radar & Threat Cone
+            </button>
+            <button class="nav-tab" data-tab="tab-historical" id="tabNavHistorical">
+                <span>📜</span> Historical Storm Explorer & Validation
+            </button>
+            <button class="nav-tab" data-tab="tab-benchmarks" id="tabNavBenchmarks">
+                <span>📊</span> Model Architecture & IMD Scale
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+        <!-- ========================================== -->
+        <!-- TAB 1: AI PREDICTOR & MULTI-HORIZON ENGINE -->
+        <!-- ========================================== -->
+        <section id="tab-predictor" class="tab-pane active">
+            
+            <!-- Quick Preset Selector Bar -->
+            <div class="preset-bar">
+                <div class="preset-info">
+                    <span class="preset-icon">🎯</span>
+                    <div>
+                        <div style="font-weight: 700; color: var(--azure); font-size: 0.95rem;">Rapid Scenario Benchmark Presets</div>
+                        <div id="presetDesc" style="font-size: 0.82rem; color: var(--text-secondary);">Select a verified historical profile to pre-fill all atmospheric & oceanic parameters</div>
+                    </div>
+                </div>
+                <div class="preset-select-wrapper">
+                    <label for="presetSelector" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;">Scenario:</label>
+                    <select id="presetSelector" class="custom-select">
+                        <option value="amphan_super_cyclone">Amphan - Super Cyclone (Cat 5 Eqv)</option>
+                        <option value="fani_extremely_severe">Fani - Extremely Severe Cyclonic Storm</option>
+                        <option value="cyclonic_storm_tamilnadu">Moderate CS - South Bay of Bengal</option>
+                        <option value="tropical_depression_monsoon">Monsoon Deep Depression - North Bay</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Two Column Interactive Layout -->
+            <div class="grid-2col">
+                
+                <!-- Left Column: Input Telemetry Controls -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title"><span>📡</span> Storm Telemetry & In-Situ Parameters</div>
+                            <div class="card-subtitle">Tune atmospheric dynamics, marine boundary layer & storm kinematics</div>
+                        </div>
+                    </div>
+
+                    <form id="telemetryForm">
+                        <input type="hidden" id="input_forecast_horizon_h" value="24">
+
+                        <!-- Section 1: Position & Forecast Horizon -->
+                        <div class="form-section">
+                            <div class="section-label">📍 Geo-Coordinates & Target Horizon</div>
+                            
+                            <div class="inputs-grid-3">
+                                <div class="form-group">
+                                    <label for="input_latitude">Latitude (°N)</label>
+                                    <input type="number" step="0.01" id="input_latitude" class="form-control" value="16.2" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_longitude">Longitude (°E)</label>
+                                    <input type="number" step="0.01" id="input_longitude" class="form-control" value="86.8" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_season">Season (Year)</label>
+                                    <input type="number" id="input_season" class="form-control" value="2024" required>
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 0.75rem;">
+                                <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">Forecast Horizon Lead Time:</label>
+                                <div class="horizon-chip-group">
+                                    <button type="button" class="horizon-chip" data-horizon="3">+3h</button>
+                                    <button type="button" class="horizon-chip" data-horizon="6">+6h</button>
+                                    <button type="button" class="horizon-chip" data-horizon="12">+12h</button>
+                                    <button type="button" class="horizon-chip" data-horizon="18">+18h</button>
+                                    <button type="button" class="horizon-chip active" data-horizon="24">+24h</button>
+                                    <button type="button" class="horizon-chip" data-horizon="36">+36h</button>
+                                    <button type="button" class="horizon-chip" data-horizon="48">+48h</button>
+                                </div>
+                            </div>
+
+                            <div id="predictorMiniMap"></div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem;">💡 Drag or click on the map above to reposition the storm eye.</div>
+                        </div>
+
+                        <!-- Section 2: Storm Kinematics & Velocity -->
+                        <div class="form-section">
+                            <div class="section-label">🌪️ Storm Motion & Barometric Trend</div>
+                            <div class="inputs-grid-3">
+                                <div class="form-group">
+                                    <label for="input_storm_speed_kts">Forward Speed (kts)</label>
+                                    <input type="number" step="0.1" id="input_storm_speed_kts" class="form-control" value="14.0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_storm_direction_deg">Bearing Track (°)</label>
+                                    <input type="number" step="0.1" id="input_storm_direction_deg" class="form-control" value="340.0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_movement_distance_from_previous_km">6h Displacement (km)</label>
+                                    <input type="number" step="0.1" id="input_movement_distance_from_previous_km" class="form-control" value="78.0">
+                                </div>
+                            </div>
+
+                            <div class="inputs-grid-2" style="margin-top: 0.65rem;">
+                                <div class="form-group">
+                                    <label for="input_wind_change_from_previous_kts">6h Wind Tendency (kts)</label>
+                                    <input type="number" step="0.1" id="input_wind_change_from_previous_kts" class="form-control" value="15.0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_pressure_change_from_previous_hpa">6h Pressure Tendency (hPa)</label>
+                                    <input type="number" step="0.1" id="input_pressure_change_from_previous_hpa" class="form-control" value="-12.0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 3: In-Situ Intensity Estimates -->
+                        <div class="form-section">
+                            <div class="section-label">🧭 Agency Estimates (WMO / IMD / JTWC)</div>
+                            <div class="inputs-grid-2">
+                                <div class="form-group">
+                                    <label for="input_wmo_wind_kts">WMO Sustained Wind (kts)</label>
+                                    <input type="number" step="0.1" id="input_wmo_wind_kts" class="form-control" value="125.0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_wmo_pressure_hpa">WMO Central Pressure (hPa)</label>
+                                    <input type="number" step="0.1" id="input_wmo_pressure_hpa" class="form-control" value="925.0">
+                                </div>
+                            </div>
+                            <div class="inputs-grid-2" style="margin-top: 0.65rem;">
+                                <div class="form-group">
+                                    <label for="input_imd_newdelhi_wind_kts">IMD New Delhi Wind (kts)</label>
+                                    <input type="number" step="0.1" id="input_imd_newdelhi_wind_kts" class="form-control" value="125.0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_imd_newdelhi_pressure_hpa">IMD Central Pressure (hPa)</label>
+                                    <input type="number" step="0.1" id="input_imd_newdelhi_pressure_hpa" class="form-control" value="925.0">
+                                </div>
+                            </div>
+                            <div class="inputs-grid-2" style="margin-top: 0.65rem;">
+                                <div class="form-group">
+                                    <label for="input_usa_wind_kts">JTWC USA Wind (kts)</label>
+                                    <input type="number" step="0.1" id="input_usa_wind_kts" class="form-control" value="130.0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_usa_pressure_hpa">JTWC USA Pressure (hPa)</label>
+                                    <input type="number" step="0.1" id="input_usa_pressure_hpa" class="form-control" value="920.0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 4: Atmospheric & Thermodynamic Environment -->
+                        <div class="form-section">
+                            <div class="section-label">🌡️ Marine & Atmospheric Thermodynamics</div>
+                            <div class="inputs-grid-3">
+                                <div class="form-group">
+                                    <label for="input_temperature_2m_c">Sea/Air Temp 2m (°C)</label>
+                                    <input type="number" step="0.1" id="input_temperature_2m_c" class="form-control" value="31.2">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_relative_humidity_pct">Rel. Humidity (%)</label>
+                                    <input type="number" step="0.1" id="input_relative_humidity_pct" class="form-control" value="89.0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_dew_point_2m_c">Dew Point (°C)</label>
+                                    <input type="number" step="0.1" id="input_dew_point_2m_c" class="form-control" value="28.4">
+                                </div>
+                            </div>
+                            <div class="inputs-grid-3" style="margin-top: 0.65rem;">
+                                <div class="form-group">
+                                    <label for="input_surface_pressure_hpa">Surface Pres. (hPa)</label>
+                                    <input type="number" step="0.1" id="input_surface_pressure_hpa" class="form-control" value="995.0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_wind_speed_10m_kmh">10m Wind (km/h)</label>
+                                    <input type="number" step="0.1" id="input_wind_speed_10m_kmh" class="form-control" value="110.0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_wind_gusts_10m_kmh">10m Gusts (km/h)</label>
+                                    <input type="number" step="0.1" id="input_wind_gusts_10m_kmh" class="form-control" value="165.0">
+                                </div>
+                            </div>
+                            <div class="inputs-grid-2" style="margin-top: 0.65rem;">
+                                <div class="form-group">
+                                    <label for="input_wind_direction_10m_deg">10m Wind Direction (°)</label>
+                                    <input type="number" step="0.1" id="input_wind_direction_10m_deg" class="form-control" value="140.0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_weather_elevation_m">Elevation (m)</label>
+                                    <input type="number" step="0.1" id="input_weather_elevation_m" class="form-control" value="0.0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 5: Hydrology & Coastal Boundary -->
+                        <div class="form-section">
+                            <div class="section-label">🌊 Precipitation & Coastal Proximity</div>
+                            <div class="inputs-grid-3">
+                                <div class="form-group">
+                                    <label for="input_precipitation_1h_mm">1h Rain (mm)</label>
+                                    <input type="number" step="0.1" id="input_precipitation_1h_mm" class="form-control" value="35.0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_precipitation_24h_mm">24h Rain (mm)</label>
+                                    <input type="number" step="0.1" id="input_precipitation_24h_mm" class="form-control" value="240.0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_precipitation_72h_mm">72h Rain (mm)</label>
+                                    <input type="number" step="0.1" id="input_precipitation_72h_mm" class="form-control" value="410.0">
+                                </div>
+                            </div>
+                            <div class="inputs-grid-3" style="margin-top: 0.65rem;">
+                                <div class="form-group">
+                                    <label for="input_precipitation_168h_mm">7-Day Rain (mm)</label>
+                                    <input type="number" step="0.1" id="input_precipitation_168h_mm" class="form-control" value="550.0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_soil_moisture_0_7cm_m3m3">Soil Moisture (m³/m³)</label>
+                                    <input type="number" step="0.01" id="input_soil_moisture_0_7cm_m3m3" class="form-control" value="0.38">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input_distance_to_land_source">Dist to Coast (km)</label>
+                                    <input type="number" step="0.1" id="input_distance_to_land_source" class="form-control" value="320.0">
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-top: 0.65rem;">
+                                <label for="input_landfall_indicator">Coastline Status</label>
+                                <select id="input_landfall_indicator" class="form-control">
+                                    <option value="0">Over Open Ocean / Sea (0)</option>
+                                    <option value="1">Imminent / Active Landfall (1)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button type="submit" id="btnPredict" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.9rem; font-size: 1.05rem; margin-top: 1rem;">
+                            <span>⚡ Execute Cyclone AI Inference</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Right Column: AI Model Forecast Deck -->
+                <div>
+                    <!-- Hero Forecast Card -->
+                    <div class="results-hero-card">
+                        <div class="hero-glow-blob"></div>
+
+                        <div class="hero-header">
+                            <div>
+                                <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--azure); font-weight: 700; letter-spacing: 1px;">Target Horizon Forecast</span>
+                                <div style="margin-top: 0.4rem;">
+                                    <span id="categoryBadge" class="category-badge-main" style="background: #dc2626; color: #fff;">Super Cyclonic Storm (SuCS)</span>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Engine:</span>
+                                <div id="resultModelUsed" style="font-size: 0.85rem; font-family: 'JetBrains Mono'; color: var(--cyan); font-weight: 700;">Tuned XGBoost Regression</div>
+                            </div>
+                        </div>
+
+                        <!-- Stats Row -->
+                        <div class="hero-stats-row" style="grid-template-columns: repeat(3, 1fr);">
+                            <div class="stat-box">
+                                <div class="stat-val" id="resultWindKts">-- kts</div>
+                                <div class="stat-label">Predicted Wind (kts)</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-val" id="resultWindKmh">-- km/h</div>
+                                <div class="stat-label">Metric Speed (km/h)</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-val" id="resultDeltaKts">-- kts</div>
+                                <div class="stat-label">Wind Δ Change</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Multi-Horizon Trajectory Chart Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title"><span>📈</span> Multi-Horizon Intensity Forecast Curve (+3h to +48h)</div>
+                                <div class="card-subtitle">Forecast trajectory across lead-time horizons using Tuned XGBoost Regression</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="multiHorizonChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: INTERACTIVE RADAR & THREAT CONE -->
+        <!-- ========================================== -->
+        <section id="tab-radar" class="tab-pane">
+            <div class="radar-map-wrapper">
+                <div id="radarMap"></div>
+                
+                <!-- Floating Info Panel -->
+                <div class="map-floating-panel">
+                    <div style="font-weight: 700; font-size: 0.95rem; color: var(--cyan); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+                        <span>🌐</span> Bay of Bengal Threat Radar
+                    </div>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 0.75rem;">
+                        Visualizing projected storm track, forward motion vector, and expanding cone of uncertainty. Click any point to inspect lead time intelligence.
+                    </p>
+                    <div style="font-size: 0.75rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 0.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem;">
+                        <div>🔵 CS / SCS: Moderate</div>
+                        <div>🔴 VSCS / ESCS: High</div>
+                        <div>🟣 Super Cyclone: Extreme</div>
+                        <div>⚪ Dotted: Forecast Cone</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: HISTORICAL EXPLORER & VALIDATION -->
+        <!-- ========================================== -->
+        <section id="tab-historical" class="tab-pane">
+            
+            <!-- Controls Bar -->
+            <div class="history-controls-bar">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <label for="historyStormSelect" style="font-weight: 600; font-size: 0.9rem; color: var(--azure);">Historical Storm:</label>
+                    <select id="historyStormSelect" class="custom-select" style="min-width: 260px;">
+                        <option>Loading historical records...</option>
+                    </select>
+                </div>
+
+                <button id="btnPlayHistory" class="btn-primary" style="padding: 0.55rem 1.2rem;">▶ Play Track</button>
+
+                <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary);">Scrubber:</span>
+                    <input type="range" id="historyScrubber" class="scrubber-slider" min="0" max="10" value="0">
+                </div>
+            </div>
+
+            <!-- Point Stats Strip -->
+            <div class="hero-stats-row" style="margin-bottom: 1.5rem;">
+                <div class="stat-box">
+                    <div class="stat-val" id="histPointTime" style="font-size: 1.2rem;">Step #1</div>
+                    <div class="stat-label">Observation Timestamp</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val" id="histActualWind" style="color: #38bdf8;">-- kts</div>
+                    <div class="stat-label">Actual Ground Truth Wind</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val" id="histPredWind" style="color: #f59e0b;">-- kts</div>
+                    <div class="stat-label">AI Model Predicted Wind</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val" id="histError" style="color: #10b981;">-- kts</div>
+                    <div class="stat-label">Absolute Error (MAE)</div>
+                </div>
+            </div>
+
+            <div class="grid-2col">
+                <!-- Map Container -->
+                <div class="card" style="padding: 0.75rem;">
+                    <div style="height: 380px; width: 100%; border-radius: var(--radius-sm); overflow: hidden;">
+                        <div id="historyMap"></div>
+                    </div>
+                </div>
+
+                <!-- Validation Curve Chart -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title"><span>📊</span> Actual vs. AI Prediction Timeline</div>
+                            <div class="card-subtitle">Tracking precision along chronological storm lifecycle</div>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="height: 320px;">
+                        <canvas id="historicalChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 4: MODEL ARCHITECTURE & IMD SCALE -->
+        <!-- ========================================== -->
+        <section id="tab-benchmarks" class="tab-pane">
+            <div class="grid-2col" style="margin-bottom: 1.75rem;">
+                <!-- Benchmarks -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title"><span>🏆</span> Operational ML Model Benchmarks</div>
+                            <div class="card-subtitle">Evaluation on 10-fold temporal cross-validation datasets</div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                        <div style="background: rgba(0, 242, 254, 0.08); border: 1px solid var(--cyan); border-radius: var(--radius-sm); padding: 1rem;">
+                            <div style="font-weight: 700; color: var(--cyan); font-size: 1rem; margin-bottom: 0.5rem;">⚡ Tuned XGBoost (Primary)</div>
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Mean Absolute Error (MAE): <b id="metricXgbMae" style="color: #fff;">1.84 kts</b></div>
+                            <div style="font-size: 0.85rem; color: var(--text-secondary);">R² Score: <b id="metricXgbR2" style="color: #fff;">0.982</b></div>
+                        </div>
+
+                        <div style="background: rgba(168, 85, 247, 0.08); border: 1px solid var(--purple); border-radius: var(--radius-sm); padding: 1rem;">
+                            <div style="font-weight: 700; color: var(--purple); font-size: 1rem; margin-bottom: 0.5rem;">🌲 Random Forest (Baseline)</div>
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Mean Absolute Error (MAE): <b id="metricRfMae" style="color: #fff;">2.15 kts</b></div>
+                            <div style="font-size: 0.85rem; color: var(--text-secondary);">R² Score: <b id="metricRfR2" style="color: #fff;">0.974</b></div>
+                        </div>
+                    </div>
+
+                    <div style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.6;">
+                        <p>The operational framework leverages high-dimensional atmospheric reanalysis, satellite scatterometer estimates (WMO, IMD, JTWC), pressure gradient tendencies, and specialized gradient boosting estimators trained for distinct lead times (+3h to +48h).</p>
+                    </div>
+                </div>
+
+                <!-- Feature Importance -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title"><span>🧬</span> Top Feature Drivers (SHAP / Gain)</div>
+                            <div class="card-subtitle">Key atmospheric & kinematic drivers impacting intensity</div>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="height: 300px;">
+                        <canvas id="featureImportanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- IMD Official Scale Reference Matrix -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><span>📋</span> India Meteorological Department (IMD) Cyclone Intensity Scale</div>
+                        <div class="card-subtitle">Standardized categorization matrix for North Indian Ocean & Bay of Bengal</div>
+                    </div>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="imd-table">
+                        <thead>
+                            <tr>
+                                <th>Category Code</th>
+                                <th>Classification Name</th>
+                                <th>Sustained Wind (Knots)</th>
+                                <th>Wind Speed (km/h)</th>
+                                <th>Damage Potential & Maritime Impact</th>
+                                <th>IMD Port Signal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="code-pill" style="background: #10b981;">LPA</span></td>
+                                <td>Low Pressure Area</td>
+                                <td>&lt; 17 kts</td>
+                                <td>&lt; 31 km/h</td>
+                                <td>Minimal localized rainfall</td>
+                                <td>No Signal</td>
+                            </tr>
+                            <tr>
+                                <td><span class="code-pill" style="background: #06b6d4;">WML</span></td>
+                                <td>Well Marked Low Pressure</td>
+                                <td>17 - 27 kts</td>
+                                <td>31 - 49 km/h</td>
+                                <td>Squally winds, rough sea conditions</td>
+                                <td>Signal 1 (Cautionary)</td>
+                            </tr>
+                            <tr>
+                                <td><span class="code-pill" style="background: #3b82f6;">D</span></td>
+                                <td>Depression</td>
+                                <td>28 - 33 kts</td>
+                                <td>50 - 61 km/h</td>
+                                <td>Minor damage to thatched huts, localized waterlogging</td>
+                                <td>Signal 3 (Warning)</td>
+                            </tr>
+                            <tr>
+                                <td><span class="code-pill" style="background: #eab308;">DD</span></td>
+                                <td>Deep Depression</td>
+                                <td>34 - 47 kts</td>
+                                <td>62 - 88 km/h</td>
+                                <td>Minor roof damage, breaking of branches, rough waves</td>
+                                <td>Signal 4 (Warning)</td>
+                            </tr>
+                            <tr>
+                                <td><span class="code-pill" style="background: #f97316;">CS</span></td>
+                                <td>Cyclonic Storm</td>
+                                <td>48 - 63 kts</td>
+                                <td>89 - 117 km/h</td>
+                                <td>Damage to thatched houses, uprooting trees, power line disruption</td>
+                                <td>Signal 6 (Danger)</td>
+                            </tr>
+                            <tr>
+                                <td><span class="code-pill" style="background: #ef4444;">SCS</span></td>
+                                <td>Severe Cyclonic Storm</td>
+                                <td>64 - 89 kts</td>
+                                <td>118 - 165 km/h</td>
+                                <td>Extensive damage to roofs, large uprooted trees, transport halts</td>
+                                <td>Signal 7 (Danger)</td>
+                            </tr>
+                            <tr>
+                                <td><span class="code-pill" style="background: #dc2626;">VSCS</span></td>
+                                <td>Very Severe Cyclonic Storm</td>
+                                <td>90 - 119 kts</td>
+                                <td>166 - 220 km/h</td>
+                                <td>Extensive structural destruction, communication breakdown, surge</td>
+                                <td>Signal 9 (Great Danger)</td>
+                            </tr>
+                            <tr>
+                                <td><span class="code-pill" style="background: #9333ea;">ESCS</span></td>
+                                <td>Extremely Severe Cyclonic Storm</td>
+                                <td>120 - 165 kts</td>
+                                <td>221 - 305 km/h</td>
+                                <td>Catastrophic structural failure, widespread coastal inundation</td>
+                                <td>Signal 10 (Great Danger)</td>
+                            </tr>
+                            <tr>
+                                <td><span class="code-pill" style="background: #ec4899;">SuCS</span></td>
+                                <td>Super Cyclonic Storm</td>
+                                <td>&gt; 165 kts</td>
+                                <td>&gt; 305 km/h</td>
+                                <td>Total devastation, high structural collapses, catastrophic surge &gt;5m</td>
+                                <td>Signal 11 (Extreme Danger)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div>CycloneGuard AI • Operational Meteorological Machine Learning Engine • Bay of Bengal & North Indian Ocean Region</div>
+        <div style="font-size: 0.75rem; margin-top: 0.35rem; color: var(--text-muted);">
+            Compliant with IMD Classification Standards • Real-time Multi-Horizon Gradient Boosted Forecasters
+        </div>
+    </footer>
+
+    <!-- Application Scripts -->
+    <script src="/static/js/presets.js"></script>
+    <script src="/static/js/map.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

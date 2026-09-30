@@ -1,0 +1,281 @@
+{
+  "target": "target_wind_kts",
+  "features": [
+    "latitude",
+    "longitude",
+    "season",
+    "forecast_horizon_h",
+    "storm_speed_kts",
+    "storm_direction_deg",
+    "movement_distance_from_previous_km",
+    "wind_change_from_previous_kts",
+    "pressure_change_from_previous_hpa",
+    "wmo_wind_kts",
+    "wmo_pressure_hpa",
+    "imd_newdelhi_wind_kts",
+    "imd_newdelhi_pressure_hpa",
+    "usa_wind_kts",
+    "usa_pressure_hpa",
+    "weather_elevation_m",
+    "temperature_2m_c",
+    "relative_humidity_pct",
+    "dew_point_2m_c",
+    "surface_pressure_hpa",
+    "wind_speed_10m_kmh",
+    "wind_direction_10m_deg",
+    "wind_gusts_10m_kmh",
+    "precipitation_1h_mm",
+    "precipitation_24h_mm",
+    "precipitation_72h_mm",
+    "precipitation_168h_mm",
+    "soil_moisture_0_7cm_m3m3",
+    "landfall_indicator",
+    "distance_to_land_source"
+  ],
+  "feature_defaults": {
+    "latitude": 13.9,
+    "longitude": 86.7,
+    "season": 2013.0,
+    "forecast_horizon_h": 12.0,
+    "storm_speed_kts": 6.0,
+    "storm_direction_deg": 280.0,
+    "movement_distance_from_previous_km": 34.953663679114904,
+    "wind_change_from_previous_kts": 0.0,
+    "pressure_change_from_previous_hpa": 0.0,
+    "wmo_wind_kts": 30.0,
+    "wmo_pressure_hpa": 996.0,
+    "imd_newdelhi_wind_kts": 30.0,
+    "imd_newdelhi_pressure_hpa": 996.0,
+    "usa_wind_kts": 35.0,
+    "usa_pressure_hpa": 998.0,
+    "weather_elevation_m": 2.0,
+    "temperature_2m_c": 27.4,
+    "relative_humidity_pct": 84.0,
+    "dew_point_2m_c": 24.4,
+    "surface_pressure_hpa": 1005.5,
+    "wind_speed_10m_kmh": 17.2,
+    "wind_direction_10m_deg": 104.0,
+    "wind_gusts_10m_kmh": 31.3,
+    "precipitation_1h_mm": 0.0,
+    "precipitation_24h_mm": 0.8,
+    "precipitation_72h_mm": 3.7,
+    "precipitation_168h_mm": 4.2,
+    "soil_moisture_0_7cm_m3m3": 0.229,
+    "landfall_indicator": 224.0,
+    "distance_to_land_source": 243.0
+  },
+  "metrics": {
+    "random_forest": {
+      "mae": 5.302,
+      "rmse": 8.86,
+      "r2": 0.7169
+    },
+    "tuned_xgboost": {
+      "mae": 4.905,
+      "rmse": 8.418,
+      "r2": 0.7445
+    },
+    "horizon_general_metrics": {
+      "3": {
+        "samples": 1075,
+        "MAE": 1.788,
+        "RMSE": 2.656
+      },
+      "6": {
+        "samples": 1037,
+        "MAE": 2.357,
+        "RMSE": 3.342
+      },
+      "9": {
+        "samples": 998,
+        "MAE": 3.013,
+        "RMSE": 4.146
+      },
+      "12": {
+        "samples": 960,
+        "MAE": 3.654,
+        "RMSE": 5.012
+      },
+      "18": {
+        "samples": 889,
+        "MAE": 5.104,
+        "RMSE": 7.196
+      },
+      "24": {
+        "samples": 819,
+        "MAE": 6.581,
+        "RMSE": 9.454
+      },
+      "36": {
+        "samples": 680,
+        "MAE": 9.614,
+        "RMSE": 14.171
+      },
+      "48": {
+        "samples": 555,
+        "MAE": 12.709,
+        "RMSE": 18.047
+      }
+    },
+    "horizon_specific_metrics": {
+      "3": {
+        "samples": 1075,
+        "MAE": 1.215,
+        "RMSE": 2.125,
+        "R2": 0.9817
+      },
+      "6": {
+        "samples": 1037,
+        "MAE": 2.175,
+        "RMSE": 3.234,
+        "R2": 0.9584
+      },
+      "9": {
+        "samples": 998,
+        "MAE": 2.969,
+        "RMSE": 4.141,
+        "R2": 0.9332
+      },
+      "12": {
+        "samples": 960,
+        "MAE": 3.787,
+        "RMSE": 5.178,
+        "R2": 0.8978
+      },
+      "18": {
+        "samples": 889,
+        "MAE": 5.262,
+        "RMSE": 7.264,
+        "R2": 0.8071
+      },
+      "24": {
+        "samples": 819,
+        "MAE": 6.624,
+        "RMSE": 9.121,
+        "R2": 0.7088
+      },
+      "36": {
+        "samples": 680,
+        "MAE": 11.238,
+        "RMSE": 16.1,
+        "R2": 0.1794
+      },
+      "48": {
+        "samples": 555,
+        "MAE": 14.365,
+        "RMSE": 20.667,
+        "R2": -0.2266
+      }
+    }
+  },
+  "top_features": [
+    {
+      "feature": "usa_wind_kts",
+      "importance": 0.24761873483657837
+    },
+    {
+      "feature": "missingindicator_temperature_2m_c",
+      "importance": 0.14261549711227417
+    },
+    {
+      "feature": "missingindicator_weather_elevation_m",
+      "importance": 0.11096318066120148
+    },
+    {
+      "feature": "precipitation_24h_mm",
+      "importance": 0.0537705235183239
+    },
+    {
+      "feature": "imd_newdelhi_wind_kts",
+      "importance": 0.05010383948683739
+    },
+    {
+      "feature": "wind_speed_10m_kmh",
+      "importance": 0.045845877379179
+    },
+    {
+      "feature": "usa_pressure_hpa",
+      "importance": 0.04360276088118553
+    },
+    {
+      "feature": "wind_gusts_10m_kmh",
+      "importance": 0.02862880565226078
+    },
+    {
+      "feature": "precipitation_72h_mm",
+      "importance": 0.02722691185772419
+    },
+    {
+      "feature": "missingindicator_usa_wind_kts",
+      "importance": 0.02481645531952381
+    },
+    {
+      "feature": "distance_to_land_source",
+      "importance": 0.02103259228169918
+    },
+    {
+      "feature": "wind_change_from_previous_kts",
+      "importance": 0.01984221488237381
+    },
+    {
+      "feature": "precipitation_168h_mm",
+      "importance": 0.019735682755708694
+    },
+    {
+      "feature": "landfall_indicator",
+      "importance": 0.01923796720802784
+    },
+    {
+      "feature": "surface_pressure_hpa",
+      "importance": 0.018130220472812653
+    },
+    {
+      "feature": "temperature_2m_c",
+      "importance": 0.016704628244042397
+    },
+    {
+      "feature": "wmo_wind_kts",
+      "importance": 0.012370189651846886
+    },
+    {
+      "feature": "forecast_horizon_h",
+      "importance": 0.010862317867577076
+    },
+    {
+      "feature": "missingindicator_usa_pressure_hpa",
+      "importance": 0.008848094381392002
+    },
+    {
+      "feature": "wind_direction_10m_deg",
+      "importance": 0.007448325864970684
+    },
+    {
+      "feature": "weather_elevation_m",
+      "importance": 0.006462344899773598
+    },
+    {
+      "feature": "soil_moisture_0_7cm_m3m3",
+      "importance": 0.006173450965434313
+    },
+    {
+      "feature": "dew_point_2m_c",
+      "importance": 0.00600398750975728
+    },
+    {
+      "feature": "pressure_change_from_previous_hpa",
+      "importance": 0.005782246123999357
+    },
+    {
+      "feature": "wmo_pressure_hpa",
+      "importance": 0.005640378221869469
+    }
+  ],
+  "training_stats": {
+    "total_samples": 34714,
+    "train_samples": 27701,
+    "test_samples": 7013,
+    "train_storms": 159,
+    "test_storms": 40,
+    "dataset_file": "CycloneGuard_Bay_of_Bengal_India_Enhanced_Real_Dataset.csv"
+  }
+}
