@@ -1,4 +1,4 @@
-// Map Manager for CycloneGuard AI using Leaflet
+// Map Manager for CycloneGuard AI using Leaflet & OpenStreetMap (Single OSM Tile Layer)
 class CycloneMapManager {
     constructor() {
         this.predictorMap = null;
@@ -15,6 +15,8 @@ class CycloneMapManager {
             path: null,
             markers: []
         };
+        this.osmTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+        this.osmAttribution = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors';
     }
 
     initPredictorMap(initialLat = 15.5, initialLon = 87.5, onCoordChange = null) {
@@ -24,14 +26,18 @@ class CycloneMapManager {
         this.predictorMap = L.map('predictorMiniMap', {
             center: [initialLat, initialLon],
             zoom: 5,
+            minZoom: 3,
+            maxZoom: 18,
             zoomControl: true,
-            attributionControl: false
+            attributionControl: true,
+            worldCopyJump: true
         });
 
-        // Dark Matter tiles for meteorology command center feel
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        // Single standard OpenStreetMap tile layer (No API key, No duplicate layers)
+        L.tileLayer(this.osmTileUrl, {
+            minZoom: 3,
             maxZoom: 18,
-            subdomains: 'abcd'
+            attribution: this.osmAttribution
         }).addTo(this.predictorMap);
 
         // Custom Cyclone Center Pulsing Icon
@@ -49,19 +55,31 @@ class CycloneMapManager {
 
         this.predictorMarker.on('dragend', (e) => {
             const pos = e.target.getLatLng();
-            if (onCoordChange) onCoordChange(pos.lat, pos.lng);
+            if (this.predictorMap) {
+                this.predictorMap.panTo(pos, { animate: true });
+            }
+            if (onCoordChange) onCoordChange(pos.lat, pos.lng, 'map');
         });
 
         this.predictorMap.on('click', (e) => {
             this.predictorMarker.setLatLng(e.latlng);
-            if (onCoordChange) onCoordChange(e.latlng.lat, e.latlng.lng);
+            this.predictorMap.panTo(e.latlng, { animate: true });
+            if (onCoordChange) onCoordChange(e.latlng.lat, e.latlng.lng, 'map');
         });
+
+        // Invalidate map size so container renders without gaps or blank areas
+        setTimeout(() => {
+            if (this.predictorMap) {
+                this.predictorMap.invalidateSize();
+                this.predictorMap.setView([initialLat, initialLon], 5);
+            }
+        }, 150);
     }
 
     updatePredictorMarker(lat, lon) {
         if (this.predictorMarker && this.predictorMap) {
             this.predictorMarker.setLatLng([lat, lon]);
-            this.predictorMap.panTo([lat, lon]);
+            this.predictorMap.setView([lat, lon], this.predictorMap.getZoom() || 5, { animate: true });
         }
     }
 
@@ -72,13 +90,17 @@ class CycloneMapManager {
         this.radarMap = L.map('radarMap', {
             center: [16.0, 86.5],
             zoom: 5,
+            minZoom: 3,
+            maxZoom: 18,
             zoomControl: true,
-            attributionControl: false
+            attributionControl: true,
+            worldCopyJump: true
         });
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        L.tileLayer(this.osmTileUrl, {
+            minZoom: 3,
             maxZoom: 18,
-            subdomains: 'abcd'
+            attribution: this.osmAttribution
         }).addTo(this.radarMap);
 
         // Add Bay of Bengal / Arabian Sea key coastal landmarks
@@ -96,9 +118,13 @@ class CycloneMapManager {
                 radius: 5,
                 color: '#38bdf8',
                 fillColor: '#0284c7',
-                fillOpacity: 0.8
+                fillOpacity: 0.85
             }).bindTooltip(`<b>${p.name}</b><br>Coastal Hub: ${p.alert}`).addTo(this.radarMap);
         });
+
+        setTimeout(() => {
+            if (this.radarMap) this.radarMap.invalidateSize();
+        }, 150);
     }
 
     renderForecastTrack(forecastData) {
@@ -130,7 +156,7 @@ class CycloneMapManager {
         this.radarLayers.markers.push(initMarker);
 
         // Render forecast trajectory and uncertainty cones
-        horizons.forEach((h, index) => {
+        horizons.forEach((h) => {
             const pt = [h.projected_latitude, h.projected_longitude];
             latlngs.push(pt);
 
@@ -139,8 +165,8 @@ class CycloneMapManager {
                 radius: h.cone_radius_km * 1000,
                 color: h.category.color,
                 fillColor: h.category.color,
-                fillOpacity: 0.12,
-                weight: 1,
+                fillOpacity: 0.15,
+                weight: 1.5,
                 dashArray: '4, 4'
             }).addTo(this.radarMap);
             this.radarLayers.cones.push(coneCircle);
@@ -150,7 +176,7 @@ class CycloneMapManager {
                 radius: 7,
                 color: '#ffffff',
                 fillColor: h.category.color,
-                fillOpacity: 0.9,
+                fillOpacity: 0.95,
                 weight: 1.5
             }).bindPopup(`
                 <div style="font-family: 'Outfit', sans-serif; min-width: 170px;">
@@ -182,14 +208,22 @@ class CycloneMapManager {
         this.historyMap = L.map('historyMap', {
             center: [16.5, 87.0],
             zoom: 5,
+            minZoom: 3,
+            maxZoom: 18,
             zoomControl: true,
-            attributionControl: false
+            attributionControl: true,
+            worldCopyJump: true
         });
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        L.tileLayer(this.osmTileUrl, {
+            minZoom: 3,
             maxZoom: 18,
-            subdomains: 'abcd'
+            attribution: this.osmAttribution
         }).addTo(this.historyMap);
+
+        setTimeout(() => {
+            if (this.historyMap) this.historyMap.invalidateSize();
+        }, 150);
     }
 
     renderHistoricalStorm(points, stormName) {
@@ -240,6 +274,19 @@ class CycloneMapManager {
             this.historyMap.panTo(this.historyLayers.markers[index].getLatLng());
         }
     }
+
+    invalidateAllMaps() {
+        if (this.predictorMap) this.predictorMap.invalidateSize();
+        if (this.radarMap) this.radarMap.invalidateSize();
+        if (this.historyMap) this.historyMap.invalidateSize();
+    }
 }
 
 window.CycloneMap = new CycloneMapManager();
+
+// Automatically handle resize across all viewports
+window.addEventListener('resize', () => {
+    if (window.CycloneMap) {
+        window.CycloneMap.invalidateAllMaps();
+    }
+});

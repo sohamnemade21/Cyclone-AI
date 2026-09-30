@@ -441,6 +441,30 @@ body {
     box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
 }
 
+.form-control.flash-update {
+    border-color: var(--cyan) !important;
+    box-shadow: 0 0 12px rgba(0, 242, 254, 0.4) !important;
+    background: rgba(0, 242, 254, 0.08) !important;
+    transition: all 0.2s ease;
+}
+
+.weather-sync-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    background: rgba(0, 242, 254, 0.12);
+    border: 1px solid rgba(0, 242, 254, 0.3);
+    color: var(--cyan);
+    margin-left: auto;
+    text-transform: none;
+    letter-spacing: 0;
+    transition: opacity 0.3s ease;
+}
+
 /* Horizon Chip Selector */
 .horizon-chip-group {
     display: flex;
@@ -477,11 +501,14 @@ body {
 
 /* Mini Map */
 #predictorMiniMap {
-    height: 190px;
+    height: 220px;
     width: 100%;
+    position: relative;
     border-radius: var(--radius-sm);
     border: 1px solid rgba(56, 189, 248, 0.25);
-    margin-top: 0.5rem;
+    margin-top: 0.75rem;
+    background: #e2e8f0;
+    overflow: hidden;
     z-index: 1;
 }
 
@@ -505,11 +532,48 @@ body {
 .pulse-core {
     font-size: 24px;
     line-height: 36px;
+    filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.8));
 }
 
 @keyframes ringPulse {
     0% { transform: scale(0.6); opacity: 1; }
     100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* Leaflet Custom Styling */
+.leaflet-container {
+    width: 100% !important;
+    height: 100% !important;
+    background: #e2e8f0 !important;
+    font-family: 'Outfit', sans-serif !important;
+    border-radius: inherit;
+}
+
+.leaflet-control-attribution {
+    background: rgba(8, 14, 26, 0.85) !important;
+    color: #94a3b8 !important;
+    font-size: 10px !important;
+    padding: 2px 8px !important;
+    border-radius: 4px;
+    border: 1px solid rgba(56, 189, 248, 0.15);
+}
+
+.leaflet-control-attribution a {
+    color: var(--azure) !important;
+    text-decoration: none;
+}
+
+.leaflet-popup-content-wrapper {
+    background: rgba(10, 18, 34, 0.95) !important;
+    color: #f8fafc !important;
+    border: 1px solid var(--border-glow) !important;
+    border-radius: var(--radius-sm) !important;
+    box-shadow: var(--shadow-glow) !important;
+}
+
+.leaflet-popup-tip {
+    background: rgba(10, 18, 34, 0.95) !important;
+    border: 1px solid var(--border-glow) !important;
 }
 
 /* Results Display Deck */
@@ -668,6 +732,7 @@ body {
 #radarMap, #historyMap {
     height: 100%;
     width: 100%;
+    background: #e2e8f0;
 }
 
 .map-floating-panel {

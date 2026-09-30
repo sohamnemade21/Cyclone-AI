@@ -67,6 +67,117 @@ async function loadSystemHealth() {
     }
 }
 
+// Open-Meteo Live Weather Integration
+let meteoDebounceTimer = null;
+
+async function fetchOpenMeteoWeather(lat, lon, autoPredict = true) {
+    if (isNaN(lat) || isNaN(lon)) return;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return;
+
+    const weatherStatus = document.getElementById('weatherSyncStatus');
+    if (weatherStatus) {
+        weatherStatus.textContent = '🔄 Open-Meteo Syncing...';
+        weatherStatus.style.opacity = '1';
+    }
+
+    try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(4)}&longitude=${Number(lon).toFixed(4)}&current=temperature_2m,relative_humidity_2m,dew_point_2m,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation&hourly=precipitation&wind_speed_unit=kmh&past_days=7&forecast_days=1`;
+        
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Open-Meteo HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data && data.current) {
+            const c = data.current;
+
+            const setField = (id, val, decimals = 1) => {
+                const el = document.getElementById(id);
+                if (el && val !== undefined && val !== null && !isNaN(val)) {
+                    el.value = Number(val).toFixed(decimals);
+                    el.classList.add('flash-update');
+                    setTimeout(() => el.classList.remove('flash-update'), 700);
+                }
+            };
+
+            // Update Thermodynamic and Wind parameters
+            setField('input_temperature_2m_c', c.temperature_2m, 1);
+            setField('input_relative_humidity_pct', c.relative_humidity_2m, 1);
+            setField('input_dew_point_2m_c', c.dew_point_2m, 1);
+            setField('input_surface_pressure_hpa', c.surface_pressure, 1);
+            setField('input_wind_speed_10m_kmh', c.wind_speed_10m, 1);
+            setField('input_wind_direction_10m_deg', c.wind_direction_10m, 1);
+            setField('input_wind_gusts_10m_kmh', c.wind_gusts_10m, 1);
+
+            if (data.elevation !== undefined && data.elevation !== null) {
+                setField('input_weather_elevation_m', data.elevation, 1);
+            }
+
+            setField('input_precipitation_1h_mm', c.precipitation, 1);
+
+            // Compute accumulated precipitation intervals from hourly records
+            if (data.hourly && Array.isArray(data.hourly.precipitation)) {
+                const precip = data.hourly.precipitation;
+                const totalHours = precip.length;
+
+                const sum24 = precip.slice(Math.max(0, totalHours - 24)).reduce((acc, v) => acc + (v || 0), 0);
+                setField('input_precipitation_24h_mm', sum24, 1);
+
+                const sum72 = precip.slice(Math.max(0, totalHours - 72)).reduce((acc, v) => acc + (v || 0), 0);
+                setField('input_precipitation_72h_mm', sum72, 1);
+
+                const sum168 = precip.slice(Math.max(0, totalHours - 168)).reduce((acc, v) => acc + (v || 0), 0);
+                setField('input_precipitation_168h_mm', sum168, 1);
+            }
+
+            if (weatherStatus) {
+                weatherStatus.textContent = '⚡ Open-Meteo Live';
+                setTimeout(() => {
+                    if (weatherStatus) weatherStatus.style.opacity = '0.9';
+                }, 2000);
+            }
+
+            // Refresh displayed AI inference predictions without page reload
+            if (autoPredict) {
+                runPrediction();
+            }
+        }
+    } catch (err) {
+        console.warn('Open-Meteo live sync warning:', err);
+        if (weatherStatus) {
+            weatherStatus.textContent = '⚠️ Weather Offline';
+        }
+    }
+}
+
+function handleCoordinateChange(lat, lon, source = 'input', debounceMs = 350) {
+    if (isNaN(lat) || isNaN(lon)) return;
+
+    // Update latitude and longitude input controls if change came from map or preset
+    if (source !== 'input') {
+        const latInput = document.getElementById('input_latitude');
+        const lonInput = document.getElementById('input_longitude');
+        if (latInput) latInput.value = Number(lat).toFixed(2);
+        if (lonInput) lonInput.value = Number(lon).toFixed(2);
+    }
+
+    // Update Leaflet map center and marker position
+    if (source !== 'map' && window.CycloneMap) {
+        window.CycloneMap.updatePredictorMarker(lat, lon);
+    }
+
+    // Debounce live weather fetch to prevent API rate limits on typing/dragging
+    if (meteoDebounceTimer) clearTimeout(meteoDebounceTimer);
+    if (debounceMs > 0) {
+        meteoDebounceTimer = setTimeout(() => {
+            fetchOpenMeteoWeather(lat, lon, true);
+        }, debounceMs);
+    } else {
+        fetchOpenMeteoWeather(lat, lon, true);
+    }
+}
+
 // Preset Loader
 function initPresets() {
     const selector = document.getElementById('presetSelector');
@@ -105,9 +216,8 @@ function loadPreset(key) {
     // Update Map
     if (window.CycloneMap) {
         if (!window.CycloneMap.predictorMap) {
-            window.CycloneMap.initPredictorMap(data.latitude, data.longitude, (lat, lon) => {
-                document.getElementById('input_latitude').value = lat.toFixed(2);
-                document.getElementById('input_longitude').value = lon.toFixed(2);
+            window.CycloneMap.initPredictorMap(data.latitude, data.longitude, (lat, lon, src) => {
+                handleCoordinateChange(lat, lon, src || 'map');
             });
         } else {
             window.CycloneMap.updatePredictorMarker(data.latitude, data.longitude);
@@ -165,19 +275,21 @@ function initForm() {
         });
     }
 
-    // Coordinate inputs manual change sync with map
+    // Coordinate inputs manual change sync with map and Open-Meteo live weather
     const latInput = document.getElementById('input_latitude');
     const lonInput = document.getElementById('input_longitude');
     if (latInput && lonInput) {
-        const syncMap = () => {
+        const onCoordInput = () => {
             const lat = parseFloat(latInput.value);
             const lon = parseFloat(lonInput.value);
-            if (!isNaN(lat) && !isNaN(lon) && window.CycloneMap) {
-                window.CycloneMap.updatePredictorMarker(lat, lon);
+            if (!isNaN(lat) && !isNaN(lon)) {
+                handleCoordinateChange(lat, lon, 'input', 400);
             }
         };
-        latInput.addEventListener('input', syncMap);
-        lonInput.addEventListener('input', syncMap);
+        latInput.addEventListener('input', onCoordInput);
+        latInput.addEventListener('change', onCoordInput);
+        lonInput.addEventListener('input', onCoordInput);
+        lonInput.addEventListener('change', onCoordInput);
     }
 }
 

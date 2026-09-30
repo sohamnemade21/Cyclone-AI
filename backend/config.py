@@ -12,7 +12,7 @@ class Settings:
 
     # Server configuration
     HOST: str = os.getenv("HOST", "0.0.0.0")
-    PORT: int = int(os.getenv("PORT", "10000"))
+    PORT: int = int(os.getenv("PORT", "8000"))
     WORKERS: int = int(os.getenv("WORKERS", "1"))
     RELOAD: bool = os.getenv("RELOAD", "false").lower() in ("true", "1", "yes")
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "info").lower()

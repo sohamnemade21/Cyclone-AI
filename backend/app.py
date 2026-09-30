@@ -221,9 +221,15 @@ def get_historical_storm_timeline(storm_id: str):
         raise HTTPException(status_code=404, detail=f"Storm ID '{storm_id}' not found")
     return {"success": True, "timeline": timeline}
 
-# Optional local static file mounting (if frontend directory is present)
+# Frontend static files mounting
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 if FRONTEND_DIR.exists():
+    css_dir = FRONTEND_DIR / "css"
+    js_dir = FRONTEND_DIR / "js"
+    if css_dir.exists():
+        app.mount("/css", StaticFiles(directory=str(css_dir)), name="css")
+    if js_dir.exists():
+        app.mount("/js", StaticFiles(directory=str(js_dir)), name="js")
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
     @app.get("/", include_in_schema=False)
