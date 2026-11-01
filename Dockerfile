@@ -39,9 +39,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # ------------------------------------------------------------------------------
-# 5. Copy Backend Application & Model Artifacts (Excluding Frontend)
+# 5. Copy Backend Application, Model Artifacts & Frontend
 # ------------------------------------------------------------------------------
 COPY backend/ ./backend/
+COPY frontend/ ./frontend/
 COPY cycloneguard_xgboost_final.joblib ./
 COPY CycloneGuard_Bay_of_Bengal_India_Enhanced_Real_Dataset.csv* ./
 COPY run_server.py ./
@@ -62,7 +63,7 @@ HEALTHCHECK --interval=30s \
     --timeout=5s \
     --start-period=15s \
     --retries=3 \
-    CMD curl -f http://localhost:10000/healthz || exit 1
+    CMD curl -f http://localhost:${PORT:-10000}/healthz || exit 1
 
 # ------------------------------------------------------------------------------
 # 8. Start Production Server

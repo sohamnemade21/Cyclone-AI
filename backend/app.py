@@ -48,14 +48,33 @@ app = FastAPI(
 # GZip compression for large responses
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# CORS Middleware with explicit origins
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"],
-)
+# CORS Middleware with explicit origins and wildcard Vercel regex
+cors_origins = list(settings.CORS_ORIGINS)
+for default_origin in [
+    "https://cycloneguard-ai-sepia.vercel.app",
+    "https://cycloneguard-ai.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]:
+    if default_origin not in cors_origins:
+        cors_origins.append(default_origin)
+
+cors_kwargs: Dict[str, Any] = {
+    "allow_methods": ["GET", "POST", "OPTIONS"],
+    "allow_headers": ["*"],
+}
+
+if "*" in cors_origins:
+    cors_kwargs["allow_origins"] = ["*"]
+    cors_kwargs["allow_credentials"] = False
+else:
+    cors_kwargs["allow_origins"] = cors_origins
+    cors_kwargs["allow_origin_regex"] = r"^https://.*\.vercel\.app$"
+    cors_kwargs["allow_credentials"] = True
+
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 # Request timing and logging middleware
 @app.middleware("http")
@@ -232,9 +251,19 @@ if FRONTEND_DIR.exists():
         app.mount("/js", StaticFiles(directory=str(js_dir)), name="js")
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
-    @app.get("/", include_in_schema=False)
-    def serve_frontend_index():
+@app.get("/", include_in_schema=False)
+def serve_frontend_index():
+    if FRONTEND_DIR.exists():
         index_file = FRONTEND_DIR / "index.html"
         if index_file.exists():
             return FileResponse(index_file)
-        return JSONResponse({"status": "CycloneGuard AI API is online. Frontend is deployed on Vercel."}, status_code=200)
+    return JSONResponse(
+        {
+            "status": "online",
+            "service": settings.APP_NAME,
+            "version": settings.APP_VERSION,
+            "docs": "/docs",
+            "frontend_live_url": "https://cycloneguard-ai-sepia.vercel.app"
+        },
+        status_code=200
+    )

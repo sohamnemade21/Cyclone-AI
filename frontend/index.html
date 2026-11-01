@@ -135,6 +135,7 @@
                                 <div class="horizon-chip-group">
                                     <button type="button" class="horizon-chip" data-horizon="3">+3h</button>
                                     <button type="button" class="horizon-chip" data-horizon="6">+6h</button>
+                                    <button type="button" class="horizon-chip" data-horizon="9">+9h</button>
                                     <button type="button" class="horizon-chip" data-horizon="12">+12h</button>
                                     <button type="button" class="horizon-chip" data-horizon="18">+18h</button>
                                     <button type="button" class="horizon-chip active" data-horizon="24">+24h</button>
@@ -179,7 +180,7 @@
 
                         <!-- Section 3: In-Situ Intensity Estimates -->
                         <div class="form-section">
-                            <div class="section-label">🧭 Agency Estimates (WMO / IMD / JTWC)</div>
+                            <div class="section-label">🧭 Agency Estimates (WMO / IMD / JTWC) • Satellite / In-Situ Observations</div>
                             <div class="inputs-grid-2">
                                 <div class="form-group">
                                     <label for="input_wmo_wind_kts">WMO Sustained Wind (kts)</label>
@@ -324,6 +325,7 @@
                         </div>
 
                         <!-- Stats Row -->
+                        <div id="predictionErrorBanner" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: #fca5a5; line-height: 1.4;"></div>
                         <div class="hero-stats-row" style="grid-template-columns: repeat(3, 1fr);">
                             <div class="stat-box">
                                 <div class="stat-val" id="resultWindKts">-- kts</div>
@@ -404,7 +406,7 @@
             </div>
 
             <!-- Point Stats Strip -->
-            <div class="hero-stats-row" style="margin-bottom: 1.5rem;">
+            <div class="hero-stats-row" style="margin-bottom: 1.5rem; grid-template-columns: repeat(5, 1fr);">
                 <div class="stat-box">
                     <div class="stat-val" id="histPointTime" style="font-size: 1.2rem;">Step #1</div>
                     <div class="stat-label">Observation Timestamp</div>
@@ -420,6 +422,10 @@
                 <div class="stat-box">
                     <div class="stat-val" id="histError" style="color: #10b981;">-- kts</div>
                     <div class="stat-label">Absolute Error (MAE)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val" id="histCategory" style="color: #c084fc;">--</div>
+                    <div class="stat-label">IMD Category</div>
                 </div>
             </div>
 

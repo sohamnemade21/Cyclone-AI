@@ -57,6 +57,7 @@ class Settings:
             "http://localhost:10000",
             "http://127.0.0.1:8000",
             "http://127.0.0.1:10000",
+            "https://cycloneguard-ai-sepia.vercel.app",
             "https://cycloneguard-ai.vercel.app"
         ]
 

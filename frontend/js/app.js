@@ -6,18 +6,25 @@ let historicalChart = null;
 let featureChart = null;
 let activeStormData = null;
 let playInterval = null;
+let meteoDebounceTimer = null;
+let healthPollTimer = null;
+let isBackendReady = false;
+let hasInitialPredictionSucceeded = false;
+let isMetricsLoaded = false;
+let isHistoricalLoaded = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
     initPresets();
     initChips();
     initForm();
-    initHistoricalExplorer();
-    loadSystemHealth();
-    loadModelMetrics();
+    initHealthMonitor();
 
-    // Trigger initial prediction with default preset
-    loadPreset('amphan_super_cyclone');
+    // Load initial default preset data into form inputs & map
+    loadPreset('amphan_super_cyclone', false);
+
+    // Initial prediction attempt (will also auto-retry if backend is still waking up)
+    runPrediction();
 });
 
 // Navigation Tabs
@@ -34,14 +41,14 @@ function initNavigation() {
             if (targetPane) targetPane.classList.add('active');
 
             // Refresh Leaflet maps when visible
-            if (targetId === 'tab-predictor' && window.CycloneMap.predictorMap) {
+            if (targetId === 'tab-predictor' && window.CycloneMap && window.CycloneMap.predictorMap) {
                 setTimeout(() => window.CycloneMap.predictorMap.invalidateSize(), 150);
-            } else if (targetId === 'tab-radar') {
+            } else if (targetId === 'tab-radar' && window.CycloneMap) {
                 setTimeout(() => {
                     if (!window.CycloneMap.radarMap) window.CycloneMap.initRadarMap();
                     window.CycloneMap.radarMap.invalidateSize();
                 }, 150);
-            } else if (targetId === 'tab-historical') {
+            } else if (targetId === 'tab-historical' && window.CycloneMap) {
                 setTimeout(() => {
                     if (!window.CycloneMap.historyMap) window.CycloneMap.initHistoryMap();
                     window.CycloneMap.historyMap.invalidateSize();
@@ -51,25 +58,80 @@ function initNavigation() {
     });
 }
 
-// System Health & Stats
-async function loadSystemHealth() {
-    try {
-        const res = await fetch(`${API_BASE}/api/health`);
-        const data = await res.json();
-        if (data.status === 'online') {
-            document.getElementById('healthStatusText').textContent = 'AI Engine Active';
-            document.getElementById('featureCountStat').textContent = `${data.feature_count} Feats`;
-            document.getElementById('datasetRecordsStat').textContent = `${data.total_historical_records.toLocaleString()} Recs`;
-        }
-    } catch (e) {
-        console.warn('Backend offline or initializing:', e);
-        document.getElementById('healthStatusText').textContent = 'Connecting...';
-    }
+// ------------------------------------------------------------------------------
+// Health Monitoring & Render Cold Start Management
+// ------------------------------------------------------------------------------
+function initHealthMonitor() {
+    checkSystemHealth();
 }
 
-// Open-Meteo Live Weather Integration
-let meteoDebounceTimer = null;
+async function checkSystemHealth() {
+    if (healthPollTimer) clearTimeout(healthPollTimer);
 
+    const statusText = document.getElementById('healthStatusText');
+    const statusDot = document.querySelector('.status-dot');
+    const featureStat = document.getElementById('featureCountStat');
+    const datasetStat = document.getElementById('datasetRecordsStat');
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+        const res = await fetch(`${API_BASE}/api/health`, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (data.status === 'online') {
+            isBackendReady = true;
+
+            if (statusText) statusText.textContent = 'AI Engine Active';
+            if (statusDot) {
+                statusDot.className = 'status-dot';
+            }
+            if (featureStat && data.feature_count) {
+                featureStat.textContent = `${data.feature_count} Feats`;
+            }
+            if (datasetStat && data.total_historical_records) {
+                datasetStat.textContent = `${data.total_historical_records.toLocaleString()} Recs`;
+            }
+
+            // Lazy load metrics and historical explorer once backend is confirmed online
+            if (!isMetricsLoaded) {
+                loadModelMetrics();
+            }
+            if (!isHistoricalLoaded) {
+                initHistoricalExplorer();
+            }
+
+            // If the initial prediction hasn't succeeded yet, run it now that the backend is awake
+            if (!hasInitialPredictionSucceeded) {
+                runPrediction();
+            }
+
+            // Schedule background keep-alive check every 30s to keep Render active
+            healthPollTimer = setTimeout(checkSystemHealth, 30000);
+            return;
+        }
+    } catch (e) {
+        console.warn('Backend waking up or unreachable:', e.message);
+    }
+
+    // Backend is initializing or spun down (Render cold start)
+    isBackendReady = false;
+    if (statusText) statusText.textContent = 'Waking up AI Engine (Render cold start)...';
+    if (statusDot) {
+        statusDot.className = 'status-dot connecting';
+    }
+
+    // Fast retry loop while waking up
+    healthPollTimer = setTimeout(checkSystemHealth, 3500);
+}
+
+// ------------------------------------------------------------------------------
+// Open-Meteo Live Atmospheric Integration (Free API, No Key Required)
+// ------------------------------------------------------------------------------
 async function fetchOpenMeteoWeather(lat, lon, autoPredict = true) {
     if (isNaN(lat) || isNaN(lon)) return;
     if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return;
@@ -83,7 +145,12 @@ async function fetchOpenMeteoWeather(lat, lon, autoPredict = true) {
     try {
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(4)}&longitude=${Number(lon).toFixed(4)}&current=temperature_2m,relative_humidity_2m,dew_point_2m,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation&hourly=precipitation&wind_speed_unit=kmh&past_days=7&forecast_days=1`;
         
-        const response = await fetch(url);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
         if (!response.ok) {
             throw new Error(`Open-Meteo HTTP ${response.status}`);
         }
@@ -101,7 +168,7 @@ async function fetchOpenMeteoWeather(lat, lon, autoPredict = true) {
                 }
             };
 
-            // Update Thermodynamic and Wind parameters
+            // Update exclusively environmental atmospheric and hydrological features
             setField('input_temperature_2m_c', c.temperature_2m, 1);
             setField('input_relative_humidity_pct', c.relative_humidity_2m, 1);
             setField('input_dew_point_2m_c', c.dew_point_2m, 1);
@@ -116,37 +183,38 @@ async function fetchOpenMeteoWeather(lat, lon, autoPredict = true) {
 
             setField('input_precipitation_1h_mm', c.precipitation, 1);
 
-            // Compute accumulated precipitation intervals from hourly records
-            if (data.hourly && Array.isArray(data.hourly.precipitation)) {
+            // Compute actual historical accumulated precipitation intervals
+            if (data.hourly && Array.isArray(data.hourly.precipitation) && Array.isArray(data.hourly.time)) {
                 const precip = data.hourly.precipitation;
-                const totalHours = precip.length;
+                const times = data.hourly.time;
+                let currIdx = times.indexOf(c.time);
+                if (currIdx === -1) currIdx = precip.length - 1;
 
-                const sum24 = precip.slice(Math.max(0, totalHours - 24)).reduce((acc, v) => acc + (v || 0), 0);
+                const sum24 = precip.slice(Math.max(0, currIdx - 23), currIdx + 1).reduce((acc, v) => acc + (v || 0), 0);
                 setField('input_precipitation_24h_mm', sum24, 1);
 
-                const sum72 = precip.slice(Math.max(0, totalHours - 72)).reduce((acc, v) => acc + (v || 0), 0);
+                const sum72 = precip.slice(Math.max(0, currIdx - 71), currIdx + 1).reduce((acc, v) => acc + (v || 0), 0);
                 setField('input_precipitation_72h_mm', sum72, 1);
 
-                const sum168 = precip.slice(Math.max(0, totalHours - 168)).reduce((acc, v) => acc + (v || 0), 0);
+                const sum168 = precip.slice(Math.max(0, currIdx - 167), currIdx + 1).reduce((acc, v) => acc + (v || 0), 0);
                 setField('input_precipitation_168h_mm', sum168, 1);
             }
 
             if (weatherStatus) {
-                weatherStatus.textContent = '⚡ Open-Meteo Live';
-                setTimeout(() => {
-                    if (weatherStatus) weatherStatus.style.opacity = '0.9';
-                }, 2000);
+                weatherStatus.textContent = `⚡ Open-Meteo Live (${Number(lat).toFixed(1)}°, ${Number(lon).toFixed(1)}°)`;
+                weatherStatus.style.opacity = '1';
             }
 
-            // Refresh displayed AI inference predictions without page reload
+            // Auto-refresh predictions if requested
             if (autoPredict) {
                 runPrediction();
             }
         }
     } catch (err) {
-        console.warn('Open-Meteo live sync warning:', err);
+        console.warn('Open-Meteo live sync notice:', err.message);
         if (weatherStatus) {
-            weatherStatus.textContent = '⚠️ Weather Offline';
+            weatherStatus.textContent = '⚠️ Weather Offline (Manual Preserved)';
+            weatherStatus.style.opacity = '0.9';
         }
     }
 }
@@ -167,7 +235,7 @@ function handleCoordinateChange(lat, lon, source = 'input', debounceMs = 350) {
         window.CycloneMap.updatePredictorMarker(lat, lon);
     }
 
-    // Debounce live weather fetch to prevent API rate limits on typing/dragging
+    // Debounce live weather fetch
     if (meteoDebounceTimer) clearTimeout(meteoDebounceTimer);
     if (debounceMs > 0) {
         meteoDebounceTimer = setTimeout(() => {
@@ -178,22 +246,25 @@ function handleCoordinateChange(lat, lon, source = 'input', debounceMs = 350) {
     }
 }
 
+// ------------------------------------------------------------------------------
 // Preset Loader
+// ------------------------------------------------------------------------------
 function initPresets() {
     const selector = document.getElementById('presetSelector');
     if (!selector) return;
 
     selector.addEventListener('change', (e) => {
-        loadPreset(e.target.value);
+        loadPreset(e.target.value, true);
     });
 }
 
-function loadPreset(key) {
+function loadPreset(key, triggerPrediction = true) {
     if (!window.CYCLONE_PRESETS || !window.CYCLONE_PRESETS[key]) return;
     const preset = window.CYCLONE_PRESETS[key];
     const data = preset.data;
 
-    document.getElementById('presetDesc').textContent = preset.desc;
+    const descEl = document.getElementById('presetDesc');
+    if (descEl) descEl.textContent = preset.desc;
 
     // Populate inputs
     for (const [k, v] of Object.entries(data)) {
@@ -224,11 +295,14 @@ function loadPreset(key) {
         }
     }
 
-    // Auto-trigger prediction
-    runPrediction();
+    if (triggerPrediction) {
+        runPrediction();
+    }
 }
 
-// Horizon Chips
+// ------------------------------------------------------------------------------
+// Horizon Chips (Lead times: 3, 6, 9, 12, 18, 24, 36, 48)
+// ------------------------------------------------------------------------------
 function initChips() {
     const chips = document.querySelectorAll('.horizon-chip');
     chips.forEach(chip => {
@@ -236,13 +310,16 @@ function initChips() {
             chips.forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
             const h = chip.getAttribute('data-horizon');
-            document.getElementById('input_forecast_horizon_h').value = h;
+            const hiddenInput = document.getElementById('input_forecast_horizon_h');
+            if (hiddenInput) hiddenInput.value = h;
             runPrediction();
         });
     });
 }
 
-// Collect Form Data
+// ------------------------------------------------------------------------------
+// Form Telemetry Collector
+// ------------------------------------------------------------------------------
 function getFormData() {
     const fields = [
         'latitude', 'longitude', 'season', 'forecast_horizon_h',
@@ -293,43 +370,111 @@ function initForm() {
     }
 }
 
-// Prediction Execution
+// ------------------------------------------------------------------------------
+// Prediction Execution & Forecast Rendering
+// ------------------------------------------------------------------------------
 async function runPrediction() {
     const payload = getFormData();
     const btn = document.getElementById('btnPredict');
-    if (btn) btn.innerHTML = '<span>⚡ Running AI Models...</span>';
+    const errorBanner = document.getElementById('predictionErrorBanner');
+
+    if (btn) {
+        btn.innerHTML = '<span class="loading-spin">🌀</span> <span>Forecasting with XGBoost...</span>';
+        btn.disabled = true;
+    }
+
+    // Provide visual loading hint on stat elements if they are empty
+    const windKtsEl = document.getElementById('resultWindKts');
+    const windKmhEl = document.getElementById('resultWindKmh');
+    const deltaEl = document.getElementById('resultDeltaKts');
+    if (windKtsEl && windKtsEl.textContent.trim() === '-- kts') windKtsEl.textContent = '...';
+    if (windKmhEl && windKmhEl.textContent.trim() === '-- km/h') windKmhEl.textContent = '...';
+    if (deltaEl && deltaEl.textContent.trim() === '-- kts') deltaEl.textContent = '...';
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s for Render cold start tolerance
+
         // Run single horizon and full multi-horizon trajectory in parallel
         const [resSingle, resMulti] = await Promise.all([
             fetch(`${API_BASE}/api/predict`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                signal: controller.signal
             }),
             fetch(`${API_BASE}/api/predict/multi-horizon`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                signal: controller.signal
             })
         ]);
+
+        clearTimeout(timeoutId);
+
+        if (!resSingle.ok) throw new Error(`Single prediction failed (HTTP ${resSingle.status})`);
+        if (!resMulti.ok) throw new Error(`Multi-horizon forecast failed (HTTP ${resMulti.status})`);
 
         const singleData = await resSingle.json();
         const multiData = await resMulti.json();
 
-        if (singleData.success) {
-            renderPredictionResults(singleData.prediction);
+        if (!singleData.success || !singleData.prediction) {
+            throw new Error(singleData.error || 'Invalid single prediction response');
         }
-        if (multiData.success) {
-            renderMultiHorizonChart(multiData.forecast);
-            if (window.CycloneMap) {
-                window.CycloneMap.renderForecastTrack(multiData.forecast);
-            }
+        if (!multiData.success || !multiData.forecast) {
+            throw new Error(multiData.error || 'Invalid multi-horizon response');
         }
+
+        hasInitialPredictionSucceeded = true;
+        isBackendReady = true;
+
+        // Render forecast deck and chart
+        renderPredictionResults(singleData.prediction);
+        renderMultiHorizonChart(multiData.forecast);
+
+        if (window.CycloneMap) {
+            window.CycloneMap.renderForecastTrack(multiData.forecast);
+        }
+
+        // Clear error banner on success
+        if (errorBanner) {
+            errorBanner.style.display = 'none';
+            errorBanner.textContent = '';
+        }
+
+        // Update health text to active
+        const statusText = document.getElementById('healthStatusText');
+        const statusDot = document.querySelector('.status-dot');
+        if (statusText) statusText.textContent = 'AI Engine Active';
+        if (statusDot) statusDot.className = 'status-dot';
+
     } catch (e) {
         console.error('Prediction failed:', e);
+
+        // Never display fabricated or fake predictions
+        if (windKtsEl && windKtsEl.textContent === '...') windKtsEl.textContent = '-- kts';
+        if (windKmhEl && windKmhEl.textContent === '...') windKmhEl.textContent = '-- km/h';
+        if (deltaEl && deltaEl.textContent === '...') deltaEl.textContent = '-- kts';
+
+        if (errorBanner) {
+            errorBanner.style.display = 'block';
+            if (!isBackendReady) {
+                errorBanner.innerHTML = '⏳ <b>AI Backend is starting up on Render</b> (cold start takes ~30–50s). Predictions will automatically populate once the server is ready.';
+            } else {
+                errorBanner.innerHTML = `⚠️ <b>Forecast request could not be completed:</b> ${e.message || 'API error'}. Please check your inputs or retry.`;
+            }
+        }
+
+        // If backend was offline, kick off health check to auto-refresh once awake
+        if (!isBackendReady) {
+            checkSystemHealth();
+        }
     } finally {
-        if (btn) btn.innerHTML = '<span>⚡ Execute Cyclone AI Inference</span>';
+        if (btn) {
+            btn.innerHTML = '<span>⚡ Execute Cyclone AI Inference</span>';
+            btn.disabled = false;
+        }
     }
 }
 
@@ -337,9 +482,9 @@ async function runPrediction() {
 function renderPredictionResults(p) {
     const cat = p.category;
     const catBadge = document.getElementById('categoryBadge');
-    if (catBadge) {
+    if (catBadge && cat) {
         catBadge.textContent = `${cat.name} (${cat.code})`;
-        catBadge.style.backgroundColor = cat.color;
+        catBadge.style.backgroundColor = cat.color || '#dc2626';
         catBadge.style.color = '#ffffff';
     }
 
@@ -350,22 +495,27 @@ function renderPredictionResults(p) {
 
     if (windKtsEl) windKtsEl.textContent = `${p.predicted_wind_kts} kts`;
     if (windKmhEl) windKmhEl.textContent = `${p.predicted_wind_kmh} km/h`;
-    if (deltaEl) deltaEl.textContent = `${p.wind_change_kts > 0 ? '+' : ''}${p.wind_change_kts} kts`;
-    if (modelEl) modelEl.textContent = "Tuned XGBoost Regression";
+    if (deltaEl) {
+        const sign = p.wind_change_kts > 0 ? '+' : '';
+        deltaEl.textContent = `${sign}${p.wind_change_kts} kts`;
+    }
+    if (modelEl) modelEl.textContent = p.model_used || "Tuned XGBoost Regression";
 }
 
-// Multi-Horizon Chart using cycloneguard_xgboost_final.joblib
+// Multi-Horizon Chart using cycloneguard_xgboost_final.joblib predictions
 function renderMultiHorizonChart(forecast) {
     const ctx = document.getElementById('multiHorizonChart');
-    if (!ctx) return;
+    if (!ctx || !forecast || !forecast.horizons) return;
 
     const horizons = forecast.horizons;
     const labels = horizons.map(h => `+${h.forecast_horizon_h}h`);
     const predictedWinds = horizons.map(h => h.predicted_wind_kts);
-    const currentWind = horizons.map(() => forecast.initial_point.wind_kts);
+    const initialWind = forecast.initial_point ? forecast.initial_point.wind_kts : predictedWinds[0];
+    const currentWind = horizons.map(() => initialWind);
 
     if (multiHorizonChart) {
         multiHorizonChart.destroy();
+        multiHorizonChart = null;
     }
 
     multiHorizonChart = new Chart(ctx, {
@@ -382,13 +532,14 @@ function renderMultiHorizonChart(forecast) {
                     fill: true,
                     tension: 0.35,
                     pointBackgroundColor: '#00f2fe',
-                    pointRadius: 5
+                    pointRadius: 5,
+                    pointHoverRadius: 7
                 },
                 {
                     label: 'Initial Eye Wind Speed (kts)',
                     data: currentWind,
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                    borderDash: [3, 3],
+                    borderColor: 'rgba(255, 255, 255, 0.35)',
+                    borderDash: [4, 4],
                     borderWidth: 1.5,
                     fill: false,
                     pointRadius: 0
@@ -408,13 +559,15 @@ function renderMultiHorizonChart(forecast) {
                         afterBody: function(context) {
                             const idx = context[0].dataIndex;
                             const h = horizons[idx];
-                            return `Metric: ${h.predicted_wind_kmh} km/h\nCategory: ${h.category.name} (${h.category.code})`;
+                            if (!h) return '';
+                            return `Metric: ${h.predicted_wind_kmh} km/h\nCategory: ${h.category?.name || 'N/A'} (${h.category?.code || ''})`;
                         }
                     }
                 }
             },
             scales: {
                 x: {
+                    title: { display: true, text: 'Forecast Horizon Lead Time', color: '#94a3b8' },
                     grid: { color: 'rgba(255, 255, 255, 0.06)' },
                     ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } }
                 },
@@ -428,32 +581,38 @@ function renderMultiHorizonChart(forecast) {
     });
 }
 
-// Historical Explorer
+// ------------------------------------------------------------------------------
+// Historical Explorer & Timeline Player
+// ------------------------------------------------------------------------------
 async function initHistoricalExplorer() {
     const stormSelect = document.getElementById('historyStormSelect');
     if (!stormSelect) return;
 
     try {
         const res = await fetch(`${API_BASE}/api/historical/storms`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        
         stormSelect.innerHTML = '';
+        if (data.storms && data.storms.length > 0) {
+            isHistoricalLoaded = true;
+            data.storms.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.storm_id;
+                opt.textContent = `${s.storm_name} (${s.season}) - Peak: ${s.peak_wind_kts} kts [${s.peak_category?.code || ''}]`;
+                stormSelect.appendChild(opt);
+            });
 
-        data.storms.forEach(s => {
-            const opt = document.createElement('option');
-            opt.value = s.storm_id;
-            opt.textContent = `${s.storm_name} (${s.season}) - Peak: ${s.peak_wind_kts} kts [${s.peak_category.code}]`;
-            stormSelect.appendChild(opt);
-        });
+            stormSelect.addEventListener('change', (e) => {
+                loadHistoricalStorm(e.target.value);
+            });
 
-        stormSelect.addEventListener('change', (e) => {
-            loadHistoricalStorm(e.target.value);
-        });
-
-        if (data.storms.length > 0) {
             loadHistoricalStorm(data.storms[0].storm_id);
+        } else {
+            stormSelect.innerHTML = '<option>No historical records available</option>';
         }
     } catch (e) {
-        console.error('Failed to load historical storms:', e);
+        console.warn('Failed to load historical storms:', e.message);
     }
 
     const scrubber = document.getElementById('historyScrubber');
@@ -472,15 +631,16 @@ async function initHistoricalExplorer() {
 async function loadHistoricalStorm(stormId) {
     try {
         const res = await fetch(`${API_BASE}/api/historical/storm/${stormId}`);
+        if (!res.ok) return;
         const data = await res.json();
-        if (!data.success) return;
+        if (!data.success || !data.timeline) return;
 
         activeStormData = data.timeline;
         const pts = activeStormData.points;
 
         const scrubber = document.getElementById('historyScrubber');
         if (scrubber) {
-            scrubber.max = pts.length - 1;
+            scrubber.max = Math.max(0, pts.length - 1);
             scrubber.value = 0;
         }
 
@@ -496,14 +656,20 @@ async function loadHistoricalStorm(stormId) {
 }
 
 function updatePlaybackPoint(idx) {
-    if (!activeStormData || !activeStormData.points[idx]) return;
+    if (!activeStormData || !activeStormData.points || !activeStormData.points[idx]) return;
     const pt = activeStormData.points[idx];
 
-    document.getElementById('histPointTime').textContent = pt.timestamp || `Step #${idx+1}`;
-    document.getElementById('histActualWind').textContent = `${pt.actual_target_wind_kts} kts`;
-    document.getElementById('histPredWind').textContent = `${pt.predicted_wind_kts} kts`;
-    document.getElementById('histError').textContent = `${pt.error_kts} kts`;
-    document.getElementById('histCategory').textContent = `${pt.category ? pt.category.name : 'N/A'}`;
+    const timeEl = document.getElementById('histPointTime');
+    const actualEl = document.getElementById('histActualWind');
+    const predEl = document.getElementById('histPredWind');
+    const errorEl = document.getElementById('histError');
+    const catEl = document.getElementById('histCategory');
+
+    if (timeEl) timeEl.textContent = pt.timestamp || `Step #${idx+1}`;
+    if (actualEl) actualEl.textContent = `${pt.actual_target_wind_kts} kts`;
+    if (predEl) predEl.textContent = `${pt.predicted_wind_kts} kts`;
+    if (errorEl) errorEl.textContent = `${pt.error_kts} kts`;
+    if (catEl) catEl.textContent = `${pt.category ? pt.category.name : 'N/A'}`;
 
     if (window.CycloneMap) {
         window.CycloneMap.highlightHistoryPoint(idx);
@@ -536,13 +702,16 @@ function togglePlayback() {
 
 function renderHistoricalChart(points, stormName) {
     const ctx = document.getElementById('historicalChart');
-    if (!ctx) return;
+    if (!ctx || !points) return;
 
     const labels = points.map((p, i) => `#${i+1}`);
     const actuals = points.map(p => p.actual_target_wind_kts);
     const preds = points.map(p => p.predicted_wind_kts);
 
-    if (historicalChart) historicalChart.destroy();
+    if (historicalChart) {
+        historicalChart.destroy();
+        historicalChart = null;
+    }
 
     historicalChart = new Chart(ctx, {
         type: 'line',
@@ -593,14 +762,18 @@ function renderHistoricalChart(points, stormName) {
     });
 }
 
-// Load Model Benchmarks & Feature Importance
+// ------------------------------------------------------------------------------
+// Model Benchmarks & Feature Importance
+// ------------------------------------------------------------------------------
 async function loadModelMetrics() {
     try {
         const res = await fetch(`${API_BASE}/api/metrics`);
+        if (!res.ok) return;
         const data = await res.json();
         const m = data.metrics;
 
-        if (m.tuned_xgboost) {
+        if (m && m.tuned_xgboost) {
+            isMetricsLoaded = true;
             const maeEl = document.getElementById('metricXgbMae');
             const r2El = document.getElementById('metricXgbR2');
             if (maeEl) maeEl.textContent = `${m.tuned_xgboost.mae} kts`;
@@ -608,9 +781,11 @@ async function loadModelMetrics() {
         }
 
         // Top features chart
-        renderFeatureImportance(data.top_features);
+        if (data.top_features) {
+            renderFeatureImportance(data.top_features);
+        }
     } catch (e) {
-        console.error('Failed to load metrics:', e);
+        console.warn('Failed to load metrics:', e.message);
     }
 }
 
@@ -622,7 +797,10 @@ function renderFeatureImportance(features) {
     const labels = top15.map(f => f.feature);
     const vals = top15.map(f => (f.importance * 100).toFixed(1));
 
-    if (featureChart) featureChart.destroy();
+    if (featureChart) {
+        featureChart.destroy();
+        featureChart = null;
+    }
 
     featureChart = new Chart(ctx, {
         type: 'bar',

@@ -77,6 +77,10 @@ class CycloneMapManager {
     }
 
     updatePredictorMarker(lat, lon) {
+        if (!this.predictorMap) {
+            this.initPredictorMap(lat, lon);
+            return;
+        }
         if (this.predictorMarker && this.predictorMap) {
             this.predictorMarker.setLatLng([lat, lon]);
             this.predictorMap.setView([lat, lon], this.predictorMap.getZoom() || 5, { animate: true });
@@ -123,13 +127,20 @@ class CycloneMapManager {
         });
 
         setTimeout(() => {
-            if (this.radarMap) this.radarMap.invalidateSize();
+            if (this.radarMap) {
+                this.radarMap.invalidateSize();
+                if (this.lastForecastData) {
+                    this.renderForecastTrack(this.lastForecastData);
+                }
+            }
         }, 150);
     }
 
     renderForecastTrack(forecastData) {
+        if (!forecastData) return;
+        this.lastForecastData = forecastData;
         if (!this.radarMap) this.initRadarMap();
-        if (!this.radarMap || !forecastData || !forecastData.horizons) return;
+        if (!this.radarMap || !forecastData.horizons) return;
 
         // Clear existing layers
         if (this.radarLayers.track) this.radarMap.removeLayer(this.radarLayers.track);
